@@ -11,3 +11,5 @@ __all__ = [
 ]
 from app.models.payroll import PayrollDefinition, PayPeriod, PayrollRun, PayrollResult, PayrollResultLine
 __all__ += ['PayrollDefinition', 'PayPeriod', 'PayrollRun', 'PayrollResult', 'PayrollResultLine']
+from app.models.fbp import FBPPlan, FBPComponent, FBPWorkerBudget, FBPElection
+__all__ += ['FBPPlan', 'FBPComponent', 'FBPWorkerBudget', 'FBPElection']

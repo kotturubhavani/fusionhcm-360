@@ -1,3 +1,4 @@
+import { FbpClient } from './fbp/api'
 import { PayrollClient } from './payroll/api'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -129,6 +130,7 @@ describe('role-aware workspace', () => {
     render(
       <MemoryRouter initialEntries={['/workers/someone-else']}>
         <Workspace
+          fbp={new FbpClient(new AuthClient('http://localhost:8000'))}
           payroll={new PayrollClient(new AuthClient('http://localhost:8000'))}
           user={user}
           api={api}

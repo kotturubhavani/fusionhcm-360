@@ -1,3 +1,5 @@
+import { FbpClient } from './fbp/api'
+import { FbpRoutes } from './fbp/pages'
 import { PayrollClient } from './payroll/api'
 import { PayrollRoutes } from './payroll/pages'
 import { useLoad } from './components/useLoad'
@@ -31,10 +33,12 @@ export function Navigation({ staff }: { staff: boolean }) {
             ['/hire', 'Hire Worker'],
             ['/reference', 'Reference Data'],
             ['/payroll', 'Payroll'],
+            ['/fbp', 'Flexible benefits'],
           ]
         : [
             ['/me', 'My employment'],
             ['/payroll/me', 'My payroll'],
+            ['/fbp/me', 'My benefits'],
           ]
       ).map(([to, text]) => (
         <NavLink
@@ -52,9 +56,11 @@ export function Navigation({ staff }: { staff: boolean }) {
 function Management({
   api,
   payroll,
+  fbp,
 }: {
   api: CoreHrClient
   payroll: PayrollClient
+  fbp: FbpClient
 }) {
   const loaded = useLoad(() => api.references(), [api])
   const [refs, setRefs] = useState<References | null>(null)
@@ -83,6 +89,7 @@ function Management({
         path="/payroll/*"
         element={<PayrollRoutes api={payroll} hr={api} staff />}
       />
+      <Route path="/fbp/*" element={<FbpRoutes api={fbp} hr={api} staff />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -91,12 +98,14 @@ export function Workspace({
   user,
   api,
   payroll,
+  fbp,
   logout,
   busy,
 }: {
   user: User
   api: CoreHrClient
   payroll: PayrollClient
+  fbp: FbpClient
   logout: () => void
   busy: boolean
 }) {
@@ -140,13 +149,17 @@ export function Workspace({
           key={user.id + user.roles.join(',')}
         >
           {staff ? (
-            <Management api={api} payroll={payroll} />
+            <Management api={api} payroll={payroll} fbp={fbp} />
           ) : (
             <Routes>
               <Route path="/me" element={<WorkerDetail api={api} self />} />
               <Route
                 path="/payroll/*"
                 element={<PayrollRoutes api={payroll} hr={api} staff={false} />}
+              />
+              <Route
+                path="/fbp/*"
+                element={<FbpRoutes api={fbp} hr={api} staff={false} />}
               />
               <Route path="*" element={<Navigate to="/me" replace />} />
             </Routes>
@@ -162,6 +175,7 @@ export function Workspace({
 export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
   const api = useMemo(() => new CoreHrClient(client), [client])
   const payroll = useMemo(() => new PayrollClient(client), [client])
+  const fbp = useMemo(() => new FbpClient(client), [client])
   const [user, setUser] = useState<User | null>(null)
   const [restoring, setRestoring] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -264,6 +278,7 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
       <Workspace
         user={user}
         api={api}
+        fbp={fbp}
         payroll={payroll}
         logout={logout}
         busy={busy}

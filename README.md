@@ -6,7 +6,7 @@ A portfolio simulation of an Enterprise Human Capital Management platform.
 
 ## Current milestone
 
-Authentication and Core HR are implemented across the backend and frontend. HR and ADMIN have workforce management screens; employees have a linked self-service view. Payroll simulation is implemented; benefits remain future work.
+Authentication and Core HR are implemented across the backend and frontend. HR and ADMIN have workforce management screens; employees have a linked self-service view. Payroll and annual flexible-benefits planning simulations are implemented, including employee allocations and HR oversight.
 
 - FastAPI, SQLAlchemy, PostgreSQL 17, Alembic, Argon2 password hashing, and JWT authentication.
 - Registration assigns EMPLOYEE; HR and ADMIN are seeded roles. Role assignment is not accepted from registration requests.
@@ -25,11 +25,11 @@ Refresh-token rotation and server-side token revocation are not implemented. Log
 
 ```text
 backend/
-  app/api/                 # Auth, health, and authorized Core HR routes
+  app/api/                 # Auth, health, Core HR, payroll and benefits routes
   app/core/                # Settings, database, password hashing and JWTs
-  app/models/              # Auth, reference, worker, assignment, and compensation models
+  app/models/              # Auth, Core HR, payroll and benefits models
   app/schemas/             # Request and response validation
-  app/services/            # Authentication and transactional Core HR services
+  app/services/            # Authentication and transactional domain services
   alembic/                 # Schema migrations
   scripts/seed_roles.py    # Idempotent role seeding; creates no users
   requirements.txt
@@ -37,6 +37,8 @@ frontend/
   src/App.tsx              # Authentication, application shell and guarded routes
   src/auth.ts              # Fetch client and in-memory token lifecycle
   src/core-hr/             # Typed API client, workforce screens and workflow forms
+  src/payroll/             # Payroll simulation and employee results
+  src/fbp/                 # Annual benefits plans and employee allocations
   src/components/          # Shared UI and async loading
   src/*.test.*             # Auth and component regression tests
   .env.example             # Public frontend configuration only
@@ -77,7 +79,7 @@ python scripts/seed_roles.py
 uvicorn app.main:app --reload
 ```
 
-The current migration head is `9085d55b6f98`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
+The current migration head is `ccc6f4b903ce`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
 
 In another terminal:
 
@@ -144,7 +146,7 @@ Each legal employer has at most one payroll definition. Definitions store curren
 
 Calculation rules (`DEMO_MONTHLY_V1`):
 
-- Base earnings sum annual salary for each payable day, then divide by `12 ? calendar days in month`. This handles mid-month joining, termination and salary changes. Inclusive dates apply.
+- Base earnings sum annual salary for each payable day, then divide by `12 * calendar days in month`. This handles mid-month joining, termination and salary changes. Inclusive dates apply.
 - ACTIVE and ON_LEAVE assignment days with compensation are paid. SUSPENDED days and history gaps are unpaid. Relationships/assignments outside the period are excluded. Current person/reference active flags do not rewrite historical eligibility; employment dates and dated assignment status govern eligibility.
 - Standard allowance is prorated by payable days. Demo retirement applies to rounded base earnings; demo withholding applies to rounded gross earnings. Defaults are 0.05 and 0.10 respectively, stored as decimal fractions. No foreign-exchange conversion is performed; mismatched currency fails the entire run.
 - Earnings and each deduction use Decimal half-up rounding to two decimal places. Gross is the sum of earning lines; net is gross less deduction lines. Negative net after rounding fails safely. Concurrent assignments each produce their own result and allowance; there is no person-level cap.
@@ -160,6 +162,26 @@ It creates `DEMO360_PAYROLL` for `DEMO360_LE0`, completed July/August 2025 perio
 
 Routes under `/payroll`: `GET/POST /definitions`, `GET /definitions/{id}`, `GET/POST /periods`, `GET /periods/{id}`, `POST /periods/{id}/process`, `GET /runs`, `GET /runs/{id}`, `GET /runs/{id}/results`, `GET /results/{id}`, and self-service `GET /me`, `GET /me/{id}`. Lists use offset/limit pagination; decimal amounts/rates are JSON strings. Processing returns the saved run with COMPLETED or FAILED status; duplicate processing returns 409. Management reads require HR/ADMIN; self-service ownership is enforced by the backend.
 
+## Flexible benefits planning (FBP)
+
+FBP is an annual synthetic benefits-planning simulation, with no statutory, tax, payroll or proprietary Oracle treatment. HR/ADMIN create one plan per legal employer/year, configure components, open the plan, generate worker budgets and review allocations. Employees see only their linked person's eligible plans and allocation history.
+
+The demo rule in `app/services/fbp/rules.py` defaults to **10% of annual base salary**, rounded half-up to two decimal places using Decimal. Salary is not CTC. Each plan stores its configurable rate; budget generation snapshots the source compensation, salary, rate, currency and worker labels once. Eligibility uses the January 1 plan start date: active person and legal employer, employment and assignment covering that date, ACTIVE assignment status, and positive compensation. Currency mismatches reject the whole operation. Each eligible assignment has its own budget; there is no person-level cap, proration or automatic midyear enrollment.
+
+Plan settings/components can change only while DRAFT. Opening freezes them. Generation is atomic and idempotent. Include an active component with a zero minimum and a maximum large enough to accept each full budget, so exact allocation is possible. A component's default is a suggestion, not an automatic election. Zero opts out; positive amounts must meet that component's minimum/maximum. Drafts may be under-allocated but never over-allocated. Submission requires the exact budget and makes elections read-only. Closing requires all budgets submitted and finalizes them permanently; there is no reopen or hard-delete API. Plan status controls editing, without an automatic calendar cutoff.
+
+The frontend provides plan creation, component management, worker totals/statuses, and My Benefits with draft/save/submit and finalized views. Money travels as decimal strings; display totals use integer cents and backend validation remains authoritative. Writes share the existing transaction lock, lock affected rows and check an expected revision to reject stale saves.
+
+Run explicitly from `backend/` after migrations and the Core HR seed:
+
+```bash
+python scripts/seed_fbp.py
+```
+
+The rerunnable seed creates a closed 2025 plan and an open 2026 plan for `DEMO360_LE0`, four synthetic components per plan, eligible budgets, finalized historical elections and a mix of submitted/draft current elections. It creates no accounts, never runs on startup, preserves existing allocations and rejects incomplete/conflicting demo data.
+
+Routes under `/fbp`: HR/ADMIN use `GET/POST /plans`, `GET/PATCH /plans/{id}`, `GET/POST /plans/{id}/components`, `PATCH /components/{id}`, `POST /plans/{id}/open`, `POST /plans/{id}/generate-budgets`, `POST /plans/{id}/close`, and `GET /plans/{id}/workers` or `/summary`. Self-service uses `GET /me`, `GET /me/{plan_id}`, `POST /me/{plan_id}/elections` and `POST /me/{plan_id}/submit`; ownership comes from the authenticated account. Plan, worker and self-service lists support offset/limit pagination.
+
 ## Verification
 
 From `frontend/`:
@@ -170,7 +192,7 @@ npm run lint
 npm run build
 ```
 
-Frontend tests use mocked fetch and React Testing Library to cover authentication restoration, refresh/retry, logout, role guards, worker views, workflow payloads, decimal salary handling, reference updates and pagination. They do not contact the database.
+Frontend tests use mocked fetch and React Testing Library to cover authentication restoration, refresh/retry, logout, role guards, worker views, workflow payloads, decimal salary handling, reference updates, payroll views, benefits workflows and pagination. They do not contact the database.
 
 From `backend/`:
 
@@ -187,4 +209,4 @@ Build output, virtual environments, dependency directories, Python caches, cover
 
 ## Planned capabilities
 
-Benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.
+Benefits-provider integration, analytics, and reporting remain future work. No real employee records or personal information should be used.
