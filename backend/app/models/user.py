@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
@@ -9,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    UniqueConstraint,
     func,
     text,
 )
@@ -16,6 +18,9 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.worker import Person
 
 class Role(Base):
     __tablename__ = "roles"
@@ -39,6 +44,14 @@ class Role(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("person_id", name="uq_users_person_id"),)
+
+    person_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("persons.id", name="fk_users_person", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    person: Mapped[Person | None] = relationship("Person", back_populates="user")
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
