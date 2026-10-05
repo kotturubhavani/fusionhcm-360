@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.core.database import Base
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+
+    # relationships
+    user_roles: Mapped[list[UserRole]] = relationship(
+        "UserRole",
+        back_populates="role",
+        cascade="all, delete-orphan",
+    )
+    users: Mapped[list[User]] = relationship(
+        "User",
+        secondary="user_roles",
+        back_populates="roles",
+        viewonly=True,
+    )
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
+    email: Mapped[str] = mapped_column(
+        String(255), nullable=False, unique=True
+    )
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("true")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    # relationships
+    # user_roles: mutation path (add/remove roles via UserRole objects)
+    user_roles: Mapped[list[UserRole]] = relationship(
+        "UserRole",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    # roles: RBAC read path — selectin issues one extra SELECT per user load,
+    # not one per role, so a user with N roles costs exactly 2 queries total.
+    # viewonly=True keeps writes through user_roles only, no overlap warnings.
+    roles: Mapped[list[Role]] = relationship(
+        "Role",
+        secondary="user_roles",
+        back_populates="users",
+        viewonly=True,
+        lazy="selectin",
+    )
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    role_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("roles.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    # relationships
+    user: Mapped[User] = relationship("User", back_populates="user_roles")
+    role: Mapped[Role] = relationship("Role", back_populates="user_roles")
