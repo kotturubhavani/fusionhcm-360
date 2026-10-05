@@ -1,3 +1,5 @@
+import { AnalyticsClient } from './analytics/api'
+import { ImportsClient } from './imports/api'
 import { FbpClient } from './fbp/api'
 import { PayrollClient } from './payroll/api'
 import { describe, expect, it, vi } from 'vitest'
@@ -130,6 +132,10 @@ describe('role-aware workspace', () => {
     render(
       <MemoryRouter initialEntries={['/workers/someone-else']}>
         <Workspace
+          analytics={
+            new AnalyticsClient(new AuthClient('http://localhost:8000'))
+          }
+          imports={new ImportsClient(new AuthClient('http://localhost:8000'))}
           fbp={new FbpClient(new AuthClient('http://localhost:8000'))}
           payroll={new PayrollClient(new AuthClient('http://localhost:8000'))}
           user={user}

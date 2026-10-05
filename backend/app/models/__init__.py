@@ -13,3 +13,9 @@ from app.models.payroll import PayrollDefinition, PayPeriod, PayrollRun, Payroll
 __all__ += ['PayrollDefinition', 'PayPeriod', 'PayrollRun', 'PayrollResult', 'PayrollResultLine']
 from app.models.fbp import FBPPlan, FBPComponent, FBPWorkerBudget, FBPElection
 __all__ += ['FBPPlan', 'FBPComponent', 'FBPWorkerBudget', 'FBPElection']
+
+from app.models.imports import ImportJob, ImportRow
+__all__ += ['ImportJob', 'ImportRow']
+
+from app.models.analytics import ReportDefinition, ReportRun, ExtractDefinition, ExtractRun
+__all__ += ['ReportDefinition', 'ReportRun', 'ExtractDefinition', 'ExtractRun']

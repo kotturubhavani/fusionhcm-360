@@ -1,3 +1,7 @@
+import { AnalyticsClient } from './analytics/api'
+import { AnalyticsRoutes } from './analytics/pages'
+import { ImportsClient } from './imports/api'
+import { ImportsRoutes } from './imports/pages'
 import { FbpClient } from './fbp/api'
 import { FbpRoutes } from './fbp/pages'
 import { PayrollClient } from './payroll/api'
@@ -34,6 +38,9 @@ export function Navigation({ staff }: { staff: boolean }) {
             ['/reference', 'Reference Data'],
             ['/payroll', 'Payroll'],
             ['/fbp', 'Flexible benefits'],
+            ['/imports', 'Data Imports'],
+            ['/reports', 'Reports'],
+            ['/extracts', 'Extracts'],
           ]
         : [
             ['/me', 'My employment'],
@@ -57,10 +64,14 @@ function Management({
   api,
   payroll,
   fbp,
+  imports,
+  analytics,
 }: {
   api: CoreHrClient
   payroll: PayrollClient
   fbp: FbpClient
+  imports: ImportsClient
+  analytics: AnalyticsClient
 }) {
   const loaded = useLoad(() => api.references(), [api])
   const [refs, setRefs] = useState<References | null>(null)
@@ -90,6 +101,12 @@ function Management({
         element={<PayrollRoutes api={payroll} hr={api} staff />}
       />
       <Route path="/fbp/*" element={<FbpRoutes api={fbp} hr={api} staff />} />
+      <Route path="/imports/*" element={<ImportsRoutes api={imports} />} />
+      <Route path="/reports/*" element={<AnalyticsRoutes api={analytics} />} />
+      <Route
+        path="/extracts/*"
+        element={<AnalyticsRoutes api={analytics} extract />}
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -99,6 +116,8 @@ export function Workspace({
   api,
   payroll,
   fbp,
+  imports,
+  analytics,
   logout,
   busy,
 }: {
@@ -106,6 +125,8 @@ export function Workspace({
   api: CoreHrClient
   payroll: PayrollClient
   fbp: FbpClient
+  imports: ImportsClient
+  analytics: AnalyticsClient
   logout: () => void
   busy: boolean
 }) {
@@ -149,7 +170,13 @@ export function Workspace({
           key={user.id + user.roles.join(',')}
         >
           {staff ? (
-            <Management api={api} payroll={payroll} fbp={fbp} />
+            <Management
+              api={api}
+              payroll={payroll}
+              fbp={fbp}
+              imports={imports}
+              analytics={analytics}
+            />
           ) : (
             <Routes>
               <Route path="/me" element={<WorkerDetail api={api} self />} />
@@ -175,6 +202,8 @@ export function Workspace({
 export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
   const api = useMemo(() => new CoreHrClient(client), [client])
   const payroll = useMemo(() => new PayrollClient(client), [client])
+  const analytics = useMemo(() => new AnalyticsClient(client), [client])
+  const imports = useMemo(() => new ImportsClient(client), [client])
   const fbp = useMemo(() => new FbpClient(client), [client])
   const [user, setUser] = useState<User | null>(null)
   const [restoring, setRestoring] = useState(true)
@@ -279,6 +308,8 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
         user={user}
         api={api}
         fbp={fbp}
+        imports={imports}
+        analytics={analytics}
         payroll={payroll}
         logout={logout}
         busy={busy}

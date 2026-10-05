@@ -43,3 +43,6 @@ qdrant_storage/
 *.crt
 credentials.json
 service-account*.json
+
+# Generated extract output
+local-data/

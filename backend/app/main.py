@@ -1,3 +1,5 @@
+from app.api.analytics import reports as reports_router, extracts as extracts_router
+from app.api.imports import router as imports_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -29,6 +31,9 @@ app.include_router(auth_router)
 app.include_router(core_hr_router)
 app.include_router(payroll_router)
 app.include_router(fbp_router)
+app.include_router(imports_router)
+app.include_router(reports_router)
+app.include_router(extracts_router)
 app.add_exception_handler(HRError, hr_error_handler)
 
 

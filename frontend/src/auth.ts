@@ -29,7 +29,11 @@ export class AuthClient {
     this.base = base.replace(/\/$/, '')
   }
 
-  private async request(path: string, init: RequestInit = {}) {
+  private async request(
+    path: string,
+    init: RequestInit = {},
+    format: 'json' | 'text' | 'blob' = 'json',
+  ) {
     if (!this.base) throw new Error('VITE_API_BASE_URL is not configured.')
     let response: Response
     try {
@@ -63,7 +67,11 @@ export class AuthClient {
         response.status,
       )
     }
-    return response.json()
+    return format === 'blob'
+      ? response.blob()
+      : format === 'text'
+        ? response.text()
+        : response.json()
   }
 
   refresh(): Promise<void> {
@@ -88,16 +96,24 @@ export class AuthClient {
     return this.api<User>('/auth/me')
   }
 
-  async api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  async api<T>(
+    path: string,
+    init: RequestInit = {},
+    format: 'json' | 'text' | 'blob' = 'json',
+  ): Promise<T> {
     const generation = this.generation
     const send = () =>
-      this.request(path, {
-        ...init,
-        headers: {
-          ...Object.fromEntries(new Headers(init.headers)),
-          Authorization: `Bearer ${this.token}`,
+      this.request(
+        path,
+        {
+          ...init,
+          headers: {
+            ...Object.fromEntries(new Headers(init.headers)),
+            Authorization: `Bearer ${this.token}`,
+          },
         },
-      })
+        format,
+      )
     try {
       if (!this.token) await this.refresh()
       if (generation !== this.generation)

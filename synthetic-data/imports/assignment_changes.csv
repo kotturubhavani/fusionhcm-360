@@ -1,0 +1,2 @@
+assignment_number,effective_date,business_unit_code,department_code,job_code,grade_code,location_code,manager_assignment_number,status,work_time_type
+IMPORT_SAMPLE_A01,2026-02-01,DEMO360_BU0,DEMO360_D0,DEMO360_J1,DEMO360_G0,DEMO360_L0,,ACTIVE,PART_TIME

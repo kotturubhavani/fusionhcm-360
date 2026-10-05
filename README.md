@@ -79,7 +79,7 @@ python scripts/seed_roles.py
 uvicorn app.main:app --reload
 ```
 
-The current migration head is `ccc6f4b903ce`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
+The current migration head is `57dcd64fceaa`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
 
 In another terminal:
 
@@ -182,6 +182,45 @@ The rerunnable seed creates a closed 2025 plan and an open 2026 plan for `DEMO36
 
 Routes under `/fbp`: HR/ADMIN use `GET/POST /plans`, `GET/PATCH /plans/{id}`, `GET/POST /plans/{id}/components`, `PATCH /components/{id}`, `POST /plans/{id}/open`, `POST /plans/{id}/generate-budgets`, `POST /plans/{id}/close`, and `GET /plans/{id}/workers` or `/summary`. Self-service uses `GET /me`, `GET /me/{plan_id}`, `POST /me/{plan_id}/elections` and `POST /me/{plan_id}/submit`; ownership comes from the authenticated account. Plan, worker and self-service lists support offset/limit pagination.
 
+## Enterprise HCM bulk imports
+
+HR/ADMIN can upload and preview CSV files, inspect row errors, then explicitly process valid rows. This is our own bulk-import simulator format, with **no Oracle HDL compatibility**. Employees have no import access. Supported types are `WORKER_HIRE` (new people only), `PERSON_UPDATE`, `ASSIGNMENT_CHANGE` and `COMPENSATION_CHANGE`. Each job handles one type; rehire remains a separate Core HR workflow.
+
+Download header-only templates from Data Imports or `GET /imports/templates/{object_type}`; `GET /imports/templates` describes required/optional columns. Use UTF-8 CSV, exact header names, YYYY-MM-DD dates and plain nonnegative decimal salaries with at most two decimal places. Codes/numbers resolve against existing records; department codes resolve within the specified business unit. One operation per target per file is allowed; rows cannot depend on other rows in the same file. Assignment changes are full snapshots. PERSON_UPDATE blanks leave fields unchanged; `<CLEAR>` clears optional person fields. No status/security fields can be imported into authentication.
+
+Defaults are 5 MiB and 5,000 rows, configurable through `IMPORT_MAX_FILE_BYTES` (up to 20 MiB) and `IMPORT_MAX_ROWS` (up to 5,000). The entire multipart request is bounded to the file limit plus 64 KiB. Unknown/duplicate headers, invalid UTF-8, malformed quoting and incorrect field counts reject the upload. Parsed raw rows are retained as JSON; original files are not retained. Filenames are display labels only. Error CSV exports neutralize formula prefixes; uploaded values are never executed.
+
+Validation runs the existing Core HR services inside rolled-back savepoints, so no Core HR changes persist. It stores normalized previews and safe row-level error codes. Processing rechecks current business rules, commits each successful operation with its row outcome, and isolates individual failures with savepoints. Invalid rows are skipped. The bounded synchronous job uses the shared domain transaction lock; successful rows and job results commit together at request completion. A fatal job failure rolls back that attempt and marks the job FAILED where the connection remains usable. A lost connection rolls back the transaction. There is no automatic retry or background queue; check history before submitting a new job after a network failure.
+
+Completed jobs cannot be processed or validated again. Correct invalid/failed rows in a new file without repeating successful rows. No import-history deletion API is provided. Uploader IDs are recorded; deleting an account nulls that link while retaining import history. CSV record numbers count logical records (header is record 1), including quoted multiline fields.
+
+Routes under `/imports`: `POST /` accepts multipart `object_type` and `file`; `GET /` lists jobs, `GET /{id}` shows metadata, `GET /{id}/rows` supports status filtering and pagination, `POST /{id}/validate` previews, `POST /{id}/process` applies valid rows, and `GET /{id}/errors.csv` downloads safe errors. These root routes are `/imports` without a trailing slash.
+
+Reusable examples and execution order are documented in [`synthetic-data/imports/README.md`](synthetic-data/imports/README.md). They use only synthetic values, create distinct sample workers and never run automatically.
+
+## Reports and extract simulator
+
+HR/ADMIN can build saved reports using controlled columns, typed filters and sorting across Core HR workers, completed payroll results, FBP allocations and import history. There is no SQL editor or employee report-builder access. Core HR reports accept an as-of date and produce one row per assignment covering that date; people without a placement on that date are omitted. Person/reference labels reflect current values. FBP reports show one row per assignment budget. Payroll reports show detail rows, not cross-currency totals.
+
+Filters are combined with AND. Operators are restricted by field type; IN uses an array, decimal values remain strings, dates use YYYY-MM-DD, and timestamps include a timezone. Null values do not match filters. Contains is case-insensitive; other text comparisons are exact. Sorting adds a stable record-ID tie-breaker (nulls last ascending, first descending). The UI supports one sort field; the API supports up to five. PATCH accepts the complete editable definition. Reports persist a bounded result snapshot and definition/as-of snapshot so pagination and exports remain consistent after later data changes. CSV and XLSX preserve selected column order and use readable headers. Amounts are exported as exact text, and spreadsheet formula prefixes are escaped. No PDF export is provided.
+
+The separate outbound extract simulator supports WORKER_SNAPSHOT, WORKER_CHANGES, PAYROLL_RESULTS and FBP_ELECTIONS with CSV or JSON output. Worker snapshots use current placements; worker changes also include ended/future assignments using their end/start-date view and end_date. Changes are detected from person, relationship, assignment and salary/version histories plus included organization references. Submitted/finalized FBP output is one row per component election; payroll output includes completed result snapshots. Extract filters use the same controlled metadata.
+
+FULL establishes a complete eligible baseline. INCREMENTAL uses **updated_at > last successful watermark and <= the upper watermark captured at run start**; its first run uses an unbounded lower watermark. Both modes advance the definition watermark only on success. Failed runs retain safe metadata and do not advance it. Scope/type changes after a successful run require a new definition. Files use run UUIDs in the controlled `local-data/extracts/` directory, excluded from Git, and downloads require HR/ADMIN authentication. `EXTRACT_OUTPUT_DIR` can configure local storage; clients cannot supply paths. No external delivery, scheduler, integration provider or automatic startup jobs are included.
+
+This is application-timestamp extraction, **not CDC or Oracle HCM Extract compatibility**. It cannot recover intermediate changes or deleted records. Calendar-driven activation without a write does not produce a delta. Transactions whose application timestamp predates a watermark but commit afterward, direct database writes and out-of-band changes can be missed; use periodic FULL baselines. All application mutations and runs share the existing simulator lock. Generation is synchronous and bounded by `ANALYTICS_MAX_ROWS` (default 5,000; maximum 20,000 source/output rows). Reports retain snapshots; extract files require local retention management. There is no automatic deletion of audit history. A database commit failure after file creation can leave an unreferenced artifact; the cleanup script below handles these without touching referenced output.
+
+Run explicitly from `backend/`:
+
+```bash
+python scripts/seed_analytics.py
+python scripts/cleanup_extract_orphans.py --older-than-days 7
+```
+
+The idempotent seed adds three reports (Active Workforce by Department, Monthly Payroll Summary, FBP Allocation Status) and three extracts (Worker Full Snapshot, Worker Incremental Changes, Payroll Results Export). It preserves existing definitions and never runs them. Cleanup removes only unreferenced UUID-named output files older than the chosen threshold; completed referenced output is retained.
+
+Report routes: `GET /reports/metadata`, `GET/POST /reports`, `GET/PATCH /reports/{id}`, `POST /reports/{id}/run`, `GET /reports/runs`, `GET /reports/runs/{id}`, `/results`, `/export.csv` and `/export.xlsx`. Extract routes: `GET/POST /extracts/definitions`, `GET/PATCH /extracts/definitions/{id}`, `POST /extracts/definitions/{id}/run`, `GET /extracts/runs`, `GET /extracts/runs/{id}` and `/download`. Lists/results are paginated. Repeated run requests create distinct audit runs; incremental repeats without changes produce empty output.
+
 ## Verification
 
 From `frontend/`:
@@ -209,4 +248,4 @@ Build output, virtual environments, dependency directories, Python caches, cover
 
 ## Planned capabilities
 
-Benefits-provider integration, analytics, and reporting remain future work. No real employee records or personal information should be used.
+Benefits-provider integration, Integration Center and AI/RAG remain future work. No real employee records or personal information should be used.

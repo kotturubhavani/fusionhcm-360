@@ -1,0 +1,3 @@
+person_number,first_name,last_name,preferred_name,date_of_birth,personal_email,phone,legal_employer_code,employment_type,start_date,assignment_number,business_unit_code,department_code,job_code,grade_code,location_code,manager_assignment_number,status,work_time_type,annual_base_salary,currency
+IMPORT_SAMPLE_P02,Wren,Synthetic,,,wren.import@example.com,,DEMO360_LE0,REGULAR,2026-01-01,IMPORT_SAMPLE_A02,DEMO360_BU0,DEMO360_D0,DEMO360_J1,DEMO360_G0,DEMO360_L0,,,FULL_TIME,600000.00,INR
+IMPORT_SAMPLE_BAD,Robin,Synthetic,,,robin.import@example.com,,DEMO360_LE0,REGULAR,2026-01-01,IMPORT_SAMPLE_BAD_A,DEMO360_BU0,DEMO360_D0,DEMO360_J1,DEMO360_G0,DEMO360_L0,,,FULL_TIME,not-a-decimal,INR
