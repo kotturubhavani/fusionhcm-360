@@ -1,0 +1,45 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker/runtime
+*.pid
+
+# Local data
+postgres-data/
+qdrant_storage/
+
+# Secrets / credentials
+*.pem
+*.key
+*.crt
+credentials.json
+service-account*.json
