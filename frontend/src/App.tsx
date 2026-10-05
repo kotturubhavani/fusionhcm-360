@@ -1,110 +1,310 @@
-import { useEffect, useRef, useState } from 'react'
+import { useLoad } from './components/useLoad'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import {
+  BrowserRouter,
+  NavLink,
+  Navigate,
+  Route,
+  Routes,
+} from 'react-router-dom'
 import { AuthClient, AuthError } from './auth'
 import type { User } from './auth'
-
+import { CoreHrClient } from './core-hr/api'
+import { Dashboard, Directory, WorkerDetail } from './core-hr/pages'
+import { HirePage } from './core-hr/forms'
+import { ReferencePage } from './core-hr/reference'
+import { Field, LoadState, Notice } from './components/ui'
+import type { References } from './core-hr/types'
 const auth = new AuthClient(import.meta.env.VITE_API_BASE_URL ?? '')
-const button = 'w-full rounded-xl bg-teal-700 px-4 py-3 font-semibold text-white transition hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-600 disabled:cursor-wait disabled:opacity-60'
-const input = 'mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/20'
-
-export default function App() {
+const isStaff = (user: User) =>
+  user.roles.some((role) => role === 'HR' || role === 'ADMIN')
+export function Navigation({ staff }: { staff: boolean }) {
+  return (
+    <nav aria-label="Main navigation">
+      {(staff
+        ? [
+            ['/', 'Dashboard'],
+            ['/workers', 'Workers'],
+            ['/hire', 'Hire Worker'],
+            ['/reference', 'Reference Data'],
+          ]
+        : [['/me', 'My employment']]
+      ).map(([to, text]) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={to === '/'}
+          className={({ isActive }) => `nav-link ${isActive ? 'selected' : ''}`}
+        >
+          {text}
+        </NavLink>
+      ))}
+    </nav>
+  )
+}
+function Management({ api }: { api: CoreHrClient }) {
+  const loaded = useLoad(() => api.references(), [api])
+  const [refs, setRefs] = useState<References | null>(null)
+  const currentRefs = refs ?? loaded.data
+  async function reload() {
+    setRefs(await api.references())
+  }
+  if (!currentRefs) return <LoadState {...loaded} />
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard api={api} refs={currentRefs} />} />
+      <Route
+        path="/workers"
+        element={<Directory api={api} refs={currentRefs} />}
+      />
+      <Route
+        path="/workers/:personId"
+        element={<WorkerDetail api={api} refs={currentRefs} />}
+      />
+      <Route path="/hire" element={<HirePage api={api} refs={currentRefs} />} />
+      <Route
+        path="/reference"
+        element={<ReferencePage api={api} refs={currentRefs} reload={reload} />}
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+export function Workspace({
+  user,
+  api,
+  logout,
+  busy,
+}: {
+  user: User
+  api: CoreHrClient
+  logout: () => void
+  busy: boolean
+}) {
+  const staff = isStaff(user)
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <a href="/" className="brand">
+          <span className="brand-mark">F</span>
+          <span>
+            FusionHCM <b>360</b>
+            <small>People operations</small>
+          </span>
+        </a>
+        <p className="nav-caption">{staff ? 'WORKSPACE' : 'SELF SERVICE'}</p>
+        <Navigation staff={staff} />
+        <div className="sidebar-footer">
+          Core HR<span>Independent HCM simulation</span>
+        </div>
+      </aside>
+      <div className="workspace">
+        <header className="topbar">
+          <span className="font-medium text-slate-600">
+            {staff ? 'People & organization' : 'Employee self service'}
+          </span>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm font-semibold">
+                {user.first_name} {user.last_name}
+              </p>
+              <p className="text-xs text-slate-500">{user.roles.join(' · ')}</p>
+            </div>
+            <button className="secondary" disabled={busy} onClick={logout}>
+              Sign out
+            </button>
+          </div>
+        </header>
+        <main
+          id="main-content"
+          className="content"
+          key={user.id + user.roles.join(',')}
+        >
+          {staff ? (
+            <Management api={api} />
+          ) : (
+            <Routes>
+              <Route path="/me" element={<WorkerDetail api={api} self />} />
+              <Route path="*" element={<Navigate to="/me" replace />} />
+            </Routes>
+          )}
+        </main>
+        <footer className="px-6 pb-6 text-xs text-slate-400">
+          FusionHCM 360 · Synthetic data only
+        </footer>
+      </div>
+    </div>
+  )
+}
+export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
+  const api = useMemo(() => new CoreHrClient(client), [client])
   const [user, setUser] = useState<User | null>(null)
   const [restoring, setRestoring] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [logoutFailed, setLogoutFailed] = useState(false)
-  const operation = useRef(0)
-  const signedIn = Boolean(user)
-
   useEffect(() => {
     let active = true
-    auth.me().then(current => { if (active) setUser(current) }).catch(reason => {
-      if (active && !(reason instanceof AuthError && reason.status === 401)) setError(reason.message)
-    }).finally(() => { if (active) setRestoring(false) })
-    return () => { active = false }
-  }, [])
-
+    client.setSessionExpiredHandler(() => {
+      if (active) {
+        setUser(null)
+        setError('Your session has expired. Please sign in again.')
+      }
+    })
+    client
+      .me()
+      .then((current) => {
+        if (active) {
+          setUser(current)
+          setError('')
+        }
+      })
+      .catch((reason) => {
+        if (active)
+          setError(
+            reason instanceof AuthError && reason.status === 401
+              ? ''
+              : reason.message,
+          )
+      })
+      .finally(() => {
+        if (active) setRestoring(false)
+      })
+    return () => {
+      active = false
+      client.setSessionExpiredHandler(undefined)
+    }
+  }, [client])
+  const signedIn = Boolean(user)
   useEffect(() => {
     if (!signedIn || busy) return
     let active = true
     let checking = false
-    const currentOperation = operation.current
-    const checkSession = async () => {
+    const check = async () => {
       if (checking || document.visibilityState === 'hidden') return
       checking = true
       try {
-        const current = await auth.me()
-        if (active && currentOperation === operation.current) { setUser(current); setError('') }
+        const current = await client.me()
+        if (active) setUser(current)
       } catch (reason) {
-        if (active && currentOperation === operation.current) {
-          if (reason instanceof AuthError && reason.status === 401) setUser(null)
-          setError(reason instanceof Error ? reason.message : 'Unable to check your session.')
-        }
-      } finally { checking = false }
+        if (active && reason instanceof AuthError && reason.status === 401)
+          setUser(null)
+      } finally {
+        checking = false
+      }
     }
-    window.addEventListener('focus', checkSession)
-    const timer = window.setInterval(checkSession, 60_000)
-    return () => { active = false; window.clearInterval(timer); window.removeEventListener('focus', checkSession) }
-  }, [signedIn, busy])
-
+    const timer = window.setInterval(check, 60_000)
+    window.addEventListener('focus', check)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
+  }, [client, signedIn, busy])
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const form = event.currentTarget
-    const data = new FormData(form)
-    operation.current++
     setBusy(true)
     setError('')
+    const data = new FormData(event.currentTarget)
     try {
-      setUser(await auth.login(String(data.get('email')).trim(), String(data.get('password'))))
-      form.reset()
+      setUser(
+        await client.login(
+          String(data.get('email')).trim(),
+          String(data.get('password')),
+        ),
+      )
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to sign in.')
-    } finally { setBusy(false) }
+    } finally {
+      setBusy(false)
+    }
   }
-
   async function logout() {
-    operation.current++
     setBusy(true)
     setUser(null)
     setError('')
     try {
-      await auth.logout()
+      await client.logout()
       setLogoutFailed(false)
     } catch {
       setLogoutFailed(true)
-      setError('Signed out locally, but the server could not clear your session cookie. Retry signing out before leaving this device.')
-    } finally { setBusy(false) }
+      setError(
+        'Signed out locally, but the session cookie could not be cleared. Retry signing out before leaving this device.',
+      )
+    } finally {
+      setBusy(false)
+    }
   }
-
+  if (user)
+    return <Workspace user={user} api={api} logout={logout} busy={busy} />
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-5 py-12 text-slate-900">
+    <main className="login-page">
       <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-700 text-lg font-bold text-white" aria-hidden="true">F</div>
-          <p className="text-xl font-bold tracking-tight">FusionHCM 360</p>
-          <p className="mt-1 text-sm text-slate-500">People. Connected.</p>
+        <div className="mb-8">
+          <span className="brand-mark mb-4">F</span>
+          <p className="text-2xl font-semibold tracking-tight">FusionHCM 360</p>
+          <p className="text-slate-500 mt-1">
+            A connected view of your workforce.
+          </p>
         </div>
-        <section aria-label="Account" aria-busy={busy || restoring} className="rounded-3xl border border-slate-200 bg-white p-7 shadow-sm sm:p-9">
-          {restoring ? <p role="status" className="py-8 text-center text-slate-600">Checking your session…</p> : <>
-            <h1 className="text-2xl font-semibold tracking-tight">{user ? `Welcome, ${user.first_name}` : 'Sign in'}</h1>
-            <p className="mt-2 text-sm text-slate-500">{user ? 'You are signed in to your account.' : 'Use your account to access FusionHCM 360.'}</p>
-            {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-            {user ? <div className="mt-7 space-y-6">
-              <dl className="space-y-4 text-sm">
-                <div><dt className="text-slate-500">Name</dt><dd className="mt-1 font-medium">{user.first_name} {user.last_name}</dd></div>
-                <div><dt className="text-slate-500">Email</dt><dd className="mt-1 break-all font-medium">{user.email}</dd></div>
-                <div><dt className="text-slate-500">Roles</dt><dd className="mt-2 flex flex-wrap gap-2">{user.roles.map(role => <span key={role} className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">{role}</span>)}</dd></div>
-              </dl>
-              <button type="button" disabled={busy} onClick={logout} className={button}>Sign out</button>
-            </div> : logoutFailed ? <button className={`${button} mt-6`} disabled={busy} onClick={logout}>{busy ? 'Signing out…' : 'Retry sign out'}</button> : <form onSubmit={login} className="mt-7 space-y-5">
-              <div><label htmlFor="email" className="text-sm font-medium">Email address</label><input className={input} id="email" name="email" type="email" autoComplete="username" placeholder="you@company.com" required disabled={busy} /></div>
-              <div><label htmlFor="password" className="text-sm font-medium">Password</label><input className={input} id="password" name="password" type="password" autoComplete="current-password" required maxLength={128} disabled={busy} /></div>
-              <button className={button} disabled={busy} type="submit">{busy ? 'Please wait…' : 'Sign in'}</button>
-            </form>}
-          </>}
+        <section className="panel" aria-busy={restoring || busy}>
+          {restoring ? (
+            <Notice>Checking your session…</Notice>
+          ) : (
+            <>
+              <h1>Sign in</h1>
+              <p className="hint">Access your people workspace.</p>
+              {error && <Notice error>{error}</Notice>}
+              {logoutFailed ? (
+                <button
+                  className="primary mt-5"
+                  disabled={busy}
+                  onClick={logout}
+                >
+                  Retry sign out
+                </button>
+              ) : (
+                <form onSubmit={login} className="space-y-5 mt-6">
+                  <fieldset disabled={busy} className="space-y-5">
+                    <Field
+                      label="Email address"
+                      name="email"
+                      type="email"
+                      autoComplete="username"
+                      required
+                    />
+                    <Field
+                      label="Password"
+                      name="password"
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      maxLength={128}
+                    />
+                    <button className="primary w-full">
+                      {busy ? 'Signing in…' : 'Sign in'}
+                    </button>
+                  </fieldset>
+                </form>
+              )}
+            </>
+          )}
         </section>
-        <p className="mt-6 text-center text-xs text-slate-500">Enterprise Human Capital Management</p>
+        <p className="mt-6 text-xs text-slate-400">
+          Independent HCM simulation · Use synthetic data only
+        </p>
       </div>
     </main>
+  )
+}
+export default function App() {
+  return (
+    <BrowserRouter>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <AuthenticatedApp />
+    </BrowserRouter>
   )
 }

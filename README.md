@@ -6,11 +6,11 @@ A portfolio simulation of an Enterprise Human Capital Management platform.
 
 ## Current milestone
 
-Authentication and the Core HR backend are implemented. The frontend currently provides login and account details; HR screens, payroll, and benefits remain future work.
+Authentication and Core HR are implemented across the backend and frontend. HR and ADMIN have workforce management screens; employees have a linked self-service view. Payroll and benefits remain future work.
 
 - FastAPI, SQLAlchemy, PostgreSQL 17, Alembic, Argon2 password hashing, and JWT authentication.
 - Registration assigns EMPLOYEE; HR and ADMIN are seeded roles. Role assignment is not accepted from registration requests.
-- React 19, TypeScript, Vite 8, and Tailwind CSS v4 login and account screen.
+- React 19, TypeScript, React Router, Vite 8, and Tailwind CSS v4 application shell and role-aware navigation.
 - Access tokens stay in memory. Refresh tokens use an HttpOnly cookie scoped to `/auth`; fetch requests include credentials.
 - Login loads `/auth/me`. Reload restores the session through refresh. An access-token 401 triggers one refresh and retry; visible signed-in tabs check the session every minute and on focus.
 - Logout clears the in-memory session and requests cookie deletion. Failed server logout offers a retry.
@@ -19,7 +19,7 @@ Authentication and the Core HR backend are implemented. The frontend currently p
 - HR and ADMIN manage workers; EMPLOYEE access is limited to the linked person.
 - Health endpoints and Docker PostgreSQL health checks remain available.
 
-Refresh-token rotation and server-side token revocation are not implemented. Logout deletes the browser cookie; previously issued JWTs retain their normal validity. There is no frontend registration page or role dashboard.
+Refresh-token rotation and server-side token revocation are not implemented. Logout deletes the browser cookie; previously issued JWTs retain their normal validity. There is no frontend registration page.
 
 ## Repository structure
 
@@ -34,9 +34,11 @@ backend/
   scripts/seed_roles.py    # Idempotent role seeding; creates no users
   requirements.txt
 frontend/
-  src/App.tsx              # Login and authenticated account screen
+  src/App.tsx              # Authentication, application shell and guarded routes
   src/auth.ts              # Fetch client and in-memory token lifecycle
-  src/auth.test.mjs        # Isolated auth regression tests (mocked fetch)
+  src/core-hr/             # Typed API client, workforce screens and workflow forms
+  src/components/          # Shared UI and async loading
+  src/*.test.*             # Auth and component regression tests
   .env.example             # Public frontend configuration only
 database/
 policies/
@@ -105,6 +107,14 @@ npm run dev
 
 Login accepts JSON, not an OAuth2 password-form body. For manual API testing, obtain the bearer token with `/auth/login`.
 
+## Core HR workspace
+
+HR and ADMIN can browse and search workers, view dated employment details, hire and rehire, append assignment and compensation changes, terminate employment with confirmation, and maintain all six reference resources. Dashboard counts use all fetched pages. Directory filtering is client-side and intended for the small synthetic dataset.
+
+Employees see only `/core-hr/me`; management routes redirect to self-service. Backend authorization remains authoritative. Manager personal details and legal employer labels unavailable in the self-service response are shown as unavailable rather than inferred. As-of views retain historical employment and salary values; current person and reference labels are not historically versioned.
+
+Salary inputs remain decimal strings. Access tokens stay in memory, and all API requests use the shared fetch client with one refresh-and-retry on 401. Production hosting must serve `index.html` for frontend route paths. No default HR/ADMIN credentials are supplied; assign roles through a controlled local administrative process, and use only synthetic accounts.
+
 ## Core HR API and demo data
 
 Run `python scripts/seed_core_hr.py` from `backend/` after migrations to load a reusable synthetic demo. It creates 10 people, two legal employers, organizational references, reporting lines, dated assignment/salary changes, termination, and rehire. The script is atomic and rerunnable, uses reserved `DEMO360_` identifiers, and creates no login accounts. It never runs on startup. Reruns preserve existing records and reject incomplete demo data instead of overwriting history.
@@ -136,7 +146,7 @@ npm run lint
 npm run build
 ```
 
-The five frontend regression tests cover login and user loading, access-token expiry recovery, invalid credentials, refresh failure, concurrent restoration, and local token cleanup on failed logout. They do not contact the database.
+Frontend tests use mocked fetch and React Testing Library to cover authentication restoration, refresh/retry, logout, role guards, worker views, workflow payloads, decimal salary handling, reference updates and pagination. They do not contact the database.
 
 From `backend/`:
 
@@ -153,4 +163,4 @@ Build output, virtual environments, dependency directories, Python caches, cover
 
 ## Planned capabilities
 
-Core HR frontend screens, payroll simulation, benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.
+Payroll simulation, benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.

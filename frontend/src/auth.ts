@@ -21,20 +21,47 @@ export class AuthClient {
   private pendingRefresh: Promise<void> | null = null
   private base: string
 
-  constructor(base: string) { this.base = base.replace(/\/$/, '') }
+  private onSessionExpired?: () => void
+  setSessionExpiredHandler(handler?: () => void) {
+    this.onSessionExpired = handler
+  }
+  constructor(base: string) {
+    this.base = base.replace(/\/$/, '')
+  }
 
   private async request(path: string, init: RequestInit = {}) {
     if (!this.base) throw new Error('VITE_API_BASE_URL is not configured.')
     let response: Response
     try {
-      response = await fetch(`${this.base}/auth${path}`, { ...init, credentials: 'include' })
+      response = await fetch(`${this.base}${path}`, {
+        ...init,
+        credentials: 'include',
+      })
     } catch {
       throw new Error('Unable to connect. Check your connection and try again.')
     }
     if (!response.ok) {
-      throw new AuthError(response.status === 401
-        ? 'Your session has expired. Please sign in again.'
-        : 'The request failed. Please try again.', response.status)
+      const body = await response.json().catch(() => ({}))
+      const detail = body.detail
+      const message =
+        response.status >= 500
+          ? 'The service could not complete this request. Please try again.'
+          : typeof detail === 'string'
+            ? detail
+            : Array.isArray(detail)
+              ? detail
+                  .map(
+                    (item: { loc: string[]; msg: string }) =>
+                      `${item.loc.filter((part) => part !== 'body').join(' / ')}: ${item.msg}`,
+                  )
+                  .join('; ')
+              : 'The request failed. Please try again.'
+      throw new AuthError(
+        response.status === 401
+          ? 'Your session has expired. Please sign in again.'
+          : message,
+        response.status,
+      )
     }
     return response.json()
   }
@@ -42,46 +69,82 @@ export class AuthClient {
   refresh(): Promise<void> {
     if (this.pendingRefresh) return this.pendingRefresh
     const generation = this.generation
-    const pending = this.request('/refresh', { method: 'POST' }).then(data => {
-      if (generation === this.generation) this.token = data.access_token
-    }).catch(error => {
-      if (generation === this.generation) this.token = null
-      throw error
-    }).finally(() => {
-      if (this.pendingRefresh === pending) this.pendingRefresh = null
-    })
+    const pending = this.request('/auth/refresh', { method: 'POST' })
+      .then((data) => {
+        if (generation === this.generation) this.token = data.access_token
+      })
+      .catch((error) => {
+        if (generation === this.generation) this.token = null
+        throw error
+      })
+      .finally(() => {
+        if (this.pendingRefresh === pending) this.pendingRefresh = null
+      })
     this.pendingRefresh = pending
     return pending
   }
 
   async me(): Promise<User> {
-    if (!this.token) await this.refresh()
+    return this.api<User>('/auth/me')
+  }
+
+  async api<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const generation = this.generation
+    const send = () =>
+      this.request(path, {
+        ...init,
+        headers: {
+          ...Object.fromEntries(new Headers(init.headers)),
+          Authorization: `Bearer ${this.token}`,
+        },
+      })
     try {
-      return await this.request('/me', { headers: { Authorization: `Bearer ${this.token}` } })
-    } catch (error) {
-      if (!(error instanceof AuthError) || error.status !== 401) throw error
-      await this.refresh()
+      if (!this.token) await this.refresh()
+      if (generation !== this.generation)
+        throw new AuthError('Session changed. Please try again.', 401)
+      const usedToken = this.token
+      let result: T
       try {
-        return await this.request('/me', { headers: { Authorization: `Bearer ${this.token}` } })
-      } catch (retryError) {
-        this.token = null
-        throw retryError
+        result = await send()
+      } catch (error) {
+        if (!(error instanceof AuthError) || error.status !== 401) throw error
+        if (generation !== this.generation) throw error
+        if (usedToken === this.token) await this.refresh()
+        if (generation !== this.generation) throw error
+        result = await send()
       }
+      if (generation !== this.generation)
+        throw new AuthError('Session changed. Please try again.', 401)
+      return result
+    } catch (error) {
+      if (
+        generation === this.generation &&
+        error instanceof AuthError &&
+        error.status === 401
+      ) {
+        this.token = null
+        this.onSessionExpired?.()
+      }
+      throw error
     }
   }
 
   async login(email: string, password: string): Promise<User> {
-    this.generation++
+    const generation = ++this.generation
     this.token = null
     this.pendingRefresh = null
     try {
-      const data = await this.request('/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const data = await this.request('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
+      if (generation !== this.generation)
+        throw new AuthError('Session changed. Please try again.', 401)
       this.token = data.access_token
     } catch (error) {
-      if (error instanceof AuthError && error.status === 401) throw new AuthError('Invalid email or password.', 401)
+      if (error instanceof AuthError && error.status === 401)
+        throw new AuthError('Invalid email or password.', 401)
       throw error
     }
     return this.me()
@@ -91,6 +154,6 @@ export class AuthClient {
     this.generation++
     this.token = null
     this.pendingRefresh = null
-    await this.request('/logout', { method: 'POST' })
+    await this.request('/auth/logout', { method: 'POST' })
   }
 }
