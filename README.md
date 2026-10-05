@@ -6,7 +6,7 @@ A portfolio simulation of an Enterprise Human Capital Management platform.
 
 ## Current milestone
 
-Authentication and Core HR are implemented across the backend and frontend. HR and ADMIN have workforce management screens; employees have a linked self-service view. Payroll and benefits remain future work.
+Authentication and Core HR are implemented across the backend and frontend. HR and ADMIN have workforce management screens; employees have a linked self-service view. Payroll simulation is implemented; benefits remain future work.
 
 - FastAPI, SQLAlchemy, PostgreSQL 17, Alembic, Argon2 password hashing, and JWT authentication.
 - Registration assigns EMPLOYEE; HR and ADMIN are seeded roles. Role assignment is not accepted from registration requests.
@@ -77,7 +77,7 @@ python scripts/seed_roles.py
 uvicorn app.main:app --reload
 ```
 
-The current migration head is `5da74b24c7cc`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
+The current migration head is `9085d55b6f98`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
 
 In another terminal:
 
@@ -136,6 +136,30 @@ Dated changes are complete snapshots appended after the latest start date, with 
 
 Core HR writes use transaction-scoped PostgreSQL advisory locking plus record locks, deliberately serializing mutations for this simulator. Services use savepoints; the API commits successful requests. All HR writes must use these services for cross-row rules to hold. No hard-delete routes are provided.
 
+## Payroll simulation
+
+Payroll is a synthetic portfolio simulation, not a statutory payroll or tax engine. It does not reproduce proprietary Oracle behavior or claim legal accuracy. HR/ADMIN can create payroll definitions and monthly periods, confirm processing, and review run history, earning/deduction lines and saved totals. Employees can view only their linked person's payroll history and result details. No money is transferred and no PDF or statutory filings are generated.
+
+Each legal employer has at most one payroll definition. Definitions store currency, demo retirement and withholding rates, and a monthly standard allowance. Definitions and completed results have no update/delete API. Periods cover exactly one calendar month; payment dates cannot precede period end. One successful run is permitted per period. Failed attempts keep safe failure metadata, roll back all result rows and reopen the period for retry. Processing is synchronous and uses the same transaction-scoped lock as Core HR writes, suitable for this small simulator.
+
+Calculation rules (`DEMO_MONTHLY_V1`):
+
+- Base earnings sum annual salary for each payable day, then divide by `12 ? calendar days in month`. This handles mid-month joining, termination and salary changes. Inclusive dates apply.
+- ACTIVE and ON_LEAVE assignment days with compensation are paid. SUSPENDED days and history gaps are unpaid. Relationships/assignments outside the period are excluded. Current person/reference active flags do not rewrite historical eligibility; employment dates and dated assignment status govern eligibility.
+- Standard allowance is prorated by payable days. Demo retirement applies to rounded base earnings; demo withholding applies to rounded gross earnings. Defaults are 0.05 and 0.10 respectively, stored as decimal fractions. No foreign-exchange conversion is performed; mismatched currency fails the entire run.
+- Earnings and each deduction use Decimal half-up rounding to two decimal places. Gross is the sum of earning lines; net is gross less deduction lines. Negative net after rounding fails safely. Concurrent assignments each produce their own result and allowance; there is no person-level cap.
+- Results snapshot worker labels, source history IDs, salary segments and applied rules. Subsequent Core HR changes do not recalculate completed payroll. No retroactive adjustments, tax bands, statutory limits, payment execution or server-side cancellation are implemented.
+
+Run the explicit seed from `backend/` after migrations and the Core HR seed:
+
+```bash
+python scripts/seed_payroll.py
+```
+
+It creates `DEMO360_PAYROLL` for `DEMO360_LE0`, completed July/August 2025 periods, and an open October 2026 period. The seed uses a INR 1,000 standard allowance and synthetic deductions, creates no accounts, never runs on startup, and preserves existing history on rerun. Incomplete or conflicting demo data is rejected rather than overwritten.
+
+Routes under `/payroll`: `GET/POST /definitions`, `GET /definitions/{id}`, `GET/POST /periods`, `GET /periods/{id}`, `POST /periods/{id}/process`, `GET /runs`, `GET /runs/{id}`, `GET /runs/{id}/results`, `GET /results/{id}`, and self-service `GET /me`, `GET /me/{id}`. Lists use offset/limit pagination; decimal amounts/rates are JSON strings. Processing returns the saved run with COMPLETED or FAILED status; duplicate processing returns 409. Management reads require HR/ADMIN; self-service ownership is enforced by the backend.
+
 ## Verification
 
 From `frontend/`:
@@ -163,4 +187,4 @@ Build output, virtual environments, dependency directories, Python caches, cover
 
 ## Planned capabilities
 
-Payroll simulation, benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.
+Benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.

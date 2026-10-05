@@ -9,3 +9,5 @@ __all__ = [
     "User", "Role", "UserRole", "Person", "WorkRelationship",
     "LegalEmployer", "BusinessUnit", "Department", "Job", "Grade", "Location",
 ]
+from app.models.payroll import PayrollDefinition, PayPeriod, PayrollRun, PayrollResult, PayrollResultLine
+__all__ += ['PayrollDefinition', 'PayPeriod', 'PayrollRun', 'PayrollResult', 'PayrollResultLine']

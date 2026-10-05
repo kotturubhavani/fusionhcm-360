@@ -1,3 +1,4 @@
+import { PayrollClient } from './payroll/api'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -127,7 +128,13 @@ describe('role-aware workspace', () => {
     const api = client()
     render(
       <MemoryRouter initialEntries={['/workers/someone-else']}>
-        <Workspace user={user} api={api} busy={false} logout={() => {}} />
+        <Workspace
+          payroll={new PayrollClient(new AuthClient('http://localhost:8000'))}
+          user={user}
+          api={api}
+          busy={false}
+          logout={() => {}}
+        />
       </MemoryRouter>,
     )
     await screen.findByText('Personal information')

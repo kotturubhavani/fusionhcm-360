@@ -1,3 +1,5 @@
+import { PayrollClient } from './payroll/api'
+import { PayrollRoutes } from './payroll/pages'
 import { useLoad } from './components/useLoad'
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
@@ -28,8 +30,12 @@ export function Navigation({ staff }: { staff: boolean }) {
             ['/workers', 'Workers'],
             ['/hire', 'Hire Worker'],
             ['/reference', 'Reference Data'],
+            ['/payroll', 'Payroll'],
           ]
-        : [['/me', 'My employment']]
+        : [
+            ['/me', 'My employment'],
+            ['/payroll/me', 'My payroll'],
+          ]
       ).map(([to, text]) => (
         <NavLink
           key={to}
@@ -43,7 +49,13 @@ export function Navigation({ staff }: { staff: boolean }) {
     </nav>
   )
 }
-function Management({ api }: { api: CoreHrClient }) {
+function Management({
+  api,
+  payroll,
+}: {
+  api: CoreHrClient
+  payroll: PayrollClient
+}) {
   const loaded = useLoad(() => api.references(), [api])
   const [refs, setRefs] = useState<References | null>(null)
   const currentRefs = refs ?? loaded.data
@@ -67,6 +79,10 @@ function Management({ api }: { api: CoreHrClient }) {
         path="/reference"
         element={<ReferencePage api={api} refs={currentRefs} reload={reload} />}
       />
+      <Route
+        path="/payroll/*"
+        element={<PayrollRoutes api={payroll} hr={api} staff />}
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
@@ -74,11 +90,13 @@ function Management({ api }: { api: CoreHrClient }) {
 export function Workspace({
   user,
   api,
+  payroll,
   logout,
   busy,
 }: {
   user: User
   api: CoreHrClient
+  payroll: PayrollClient
   logout: () => void
   busy: boolean
 }) {
@@ -122,10 +140,14 @@ export function Workspace({
           key={user.id + user.roles.join(',')}
         >
           {staff ? (
-            <Management api={api} />
+            <Management api={api} payroll={payroll} />
           ) : (
             <Routes>
               <Route path="/me" element={<WorkerDetail api={api} self />} />
+              <Route
+                path="/payroll/*"
+                element={<PayrollRoutes api={payroll} hr={api} staff={false} />}
+              />
               <Route path="*" element={<Navigate to="/me" replace />} />
             </Routes>
           )}
@@ -139,6 +161,7 @@ export function Workspace({
 }
 export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
   const api = useMemo(() => new CoreHrClient(client), [client])
+  const payroll = useMemo(() => new PayrollClient(client), [client])
   const [user, setUser] = useState<User | null>(null)
   const [restoring, setRestoring] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -237,7 +260,15 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
     }
   }
   if (user)
-    return <Workspace user={user} api={api} logout={logout} busy={busy} />
+    return (
+      <Workspace
+        user={user}
+        api={api}
+        payroll={payroll}
+        logout={logout}
+        busy={busy}
+      />
+    )
   return (
     <main className="login-page">
       <div className="w-full max-w-md">

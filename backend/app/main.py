@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.payroll import router as payroll_router
 from app.api.auth import router as auth_router
 from app.api.core_hr import router as core_hr_router, hr_error_handler
 from app.services.core_hr.common import HRError
@@ -25,6 +26,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(core_hr_router)
+app.include_router(payroll_router)
 app.add_exception_handler(HRError, hr_error_handler)
 
 
