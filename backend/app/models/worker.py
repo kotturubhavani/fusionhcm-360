@@ -1,4 +1,4 @@
-"""Worker identity and employment episodes; assignment details come later."""
+"""Worker identity and employment episodes."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from app.core.database import Base
 
 if TYPE_CHECKING:
+    from app.models.assignment import Assignment
     from app.models.reference import LegalEmployer
     from app.models.user import User
 
@@ -80,3 +81,5 @@ class WorkRelationship(WorkerTimestamps, Base):
 
     person: Mapped[Person] = relationship(back_populates="work_relationships")
     legal_employer: Mapped[LegalEmployer] = relationship("LegalEmployer")
+
+    assignments: Mapped[list[Assignment]] = relationship("Assignment", back_populates="work_relationship", passive_deletes="all")
