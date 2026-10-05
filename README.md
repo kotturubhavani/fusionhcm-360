@@ -6,7 +6,7 @@ A portfolio simulation of an Enterprise Human Capital Management platform.
 
 ## Current milestone
 
-Backend and frontend authentication are implemented. Core HR and other business modules are not implemented yet.
+Authentication and the Core HR backend are implemented. The frontend currently provides login and account details; HR screens, payroll, and benefits remain future work.
 
 - FastAPI, SQLAlchemy, PostgreSQL 17, Alembic, Argon2 password hashing, and JWT authentication.
 - Registration assigns EMPLOYEE; HR and ADMIN are seeded roles. Role assignment is not accepted from registration requests.
@@ -15,6 +15,8 @@ Backend and frontend authentication are implemented. Core HR and other business 
 - Login loads `/auth/me`. Reload restores the session through refresh. An access-token 401 triggers one refresh and retry; visible signed-in tabs check the session every minute and on focus.
 - Logout clears the in-memory session and requests cookie deletion. Failed server logout offers a retry.
 - RBAC dependencies use explicit allowlists: EMPLOYEE only, HR or ADMIN, and ADMIN only. Temporary RBAC demonstration routes have been removed.
+- Core HR supports reference data, person identity, hire/rehire, dated assignments, independent salary history, termination, and as-of worker views.
+- HR and ADMIN manage workers; EMPLOYEE access is limited to the linked person.
 - Health endpoints and Docker PostgreSQL health checks remain available.
 
 Refresh-token rotation and server-side token revocation are not implemented. Logout deletes the browser cookie; previously issued JWTs retain their normal validity. There is no frontend registration page or role dashboard.
@@ -23,11 +25,11 @@ Refresh-token rotation and server-side token revocation are not implemented. Log
 
 ```text
 backend/
-  app/api/                 # Auth dependencies, auth and health routes
+  app/api/                 # Auth, health, and authorized Core HR routes
   app/core/                # Settings, database, password hashing and JWTs
-  app/models/              # User, Role, UserRole
+  app/models/              # Auth, reference, worker, assignment, and compensation models
   app/schemas/             # Request and response validation
-  app/services/            # Authentication service
+  app/services/            # Authentication and transactional Core HR services
   alembic/                 # Schema migrations
   scripts/seed_roles.py    # Idempotent role seeding; creates no users
   requirements.txt
@@ -73,7 +75,7 @@ python scripts/seed_roles.py
 uvicorn app.main:app --reload
 ```
 
-The current migration head is `87ec97bdf444`. Seeding creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
+The current migration head is `5da74b24c7cc`. `seed_roles.py` creates EMPLOYEE, HR, and ADMIN only. No default account or development administrator is created. For local sign-in, register a synthetic account through `POST /auth/register` in Swagger UI, then use it on the frontend.
 
 In another terminal:
 
@@ -103,6 +105,27 @@ npm run dev
 
 Login accepts JSON, not an OAuth2 password-form body. For manual API testing, obtain the bearer token with `/auth/login`.
 
+## Core HR API and demo data
+
+Run `python scripts/seed_core_hr.py` from `backend/` after migrations to load a reusable synthetic demo. It creates 10 people, two legal employers, organizational references, reporting lines, dated assignment/salary changes, termination, and rehire. The script is atomic and rerunnable, uses reserved `DEMO360_` identifiers, and creates no login accounts. It never runs on startup. Reruns preserve existing records and reject incomplete demo data instead of overwriting history.
+
+| Routes under `/core-hr` | Capability |
+|---|---|
+| `GET/POST /reference/{resource}`, `GET/PATCH /reference/{resource}/{id}` | Legal employers, business units, departments, jobs, grades, locations; PATCH also activates/deactivates |
+| `POST/GET /persons`, `GET/PATCH /persons/{id}` | Person creation, listing, and demographic/contact updates |
+| `GET /persons/{id}/work-relationships` | Employment episodes |
+| `POST /workers/hire`, `POST /workers/{id}/rehire` | Atomic employment, assignment, and compensation creation |
+| `GET /workers`, `GET /workers/{id}?as_of=YYYY-MM-DD` | Worker views with all current placements |
+| `POST /assignments/{id}/changes`, `POST /assignments/{id}/compensation` | Independent dated organization and salary changes |
+| `POST /assignments/{id}/end`, `POST /work-relationships/{id}/terminate` | End assignment or employment and close history |
+| `GET /me` | Current account's linked person; no caller-supplied identity |
+
+Mutation and listing routes require HR or ADMIN. Employees can read only their own linked person/worker detail; manager personal data is excluded from self-service. Person, worker, and reference lists accept `offset` and `limit` (maximum 100); the per-person relationship endpoint returns all employment episodes.
+
+Dated changes are complete snapshots appended after the latest start date, with inclusive end dates. Arbitrary historical corrections are not supported. Termination rejects future scheduled changes and unresolved manager links instead of deleting history. Submit salary as a decimal string, such as `"750000.00"`. A worker with no employment on the requested date returns an empty `placements` list. As-of dates select employment and compensation history; person and reference labels reflect their current values.
+
+Core HR writes use transaction-scoped PostgreSQL advisory locking plus record locks, deliberately serializing mutations for this simulator. Services use savepoints; the API commits successful requests. All HR writes must use these services for cross-row rules to hold. No hard-delete routes are provided.
+
 ## Verification
 
 From `frontend/`:
@@ -124,10 +147,10 @@ alembic current
 alembic check
 ```
 
-There is currently no retained backend pytest suite. The disposable live-database verification scripts were removed after the auth milestone checks. The existing Starlette/httpx TestClient deprecation warning does not require a dependency change for this milestone.
+Run `python -m pytest -q -W error tests` from `backend/` against the migrated local PostgreSQL database. Tests roll back their fixture data. The known upstream Starlette/httpx TestClient import deprecation is narrowly filtered in the API tests; other warnings are errors.
 
 Build output, virtual environments, dependency directories, Python caches, coverage, and local environment files are ignored. Only source, configuration examples, migrations, and reusable tests belong in a commit.
 
 ## Planned capabilities
 
-Core HR, payroll simulation, benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.
+Core HR frontend screens, payroll simulation, benefits administration, analytics, and reporting remain future work. No real employee records or personal information should be used.

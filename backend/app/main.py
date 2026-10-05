@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.auth import router as auth_router
+from app.api.core_hr import router as core_hr_router, hr_error_handler
+from app.services.core_hr.common import HRError
 from app.api.health import router as health_router
 from app.core.config import settings
 
@@ -15,13 +17,15 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["Authorization", "Content-Type"],
     allow_credentials=True,
 )
 
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(core_hr_router)
+app.add_exception_handler(HRError, hr_error_handler)
 
 
 @app.get("/")

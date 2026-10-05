@@ -1,4 +1,4 @@
-"""Assignment identity and dated organizational details; no compensation or services."""
+"""Assignment identity and dated organizational details."""
 from __future__ import annotations
 
 from datetime import date
@@ -41,6 +41,8 @@ class Assignment(WorkerTimestamps, Base):
     manager_versions: Mapped[list[AssignmentVersion]] = relationship(
         back_populates="manager_assignment", foreign_keys="AssignmentVersion.manager_assignment_id", passive_deletes="all",
     )
+
+    compensation_history = relationship("AssignmentCompensation", back_populates="assignment", passive_deletes="all")
 
     @validates("assignment_number")
     def normalize_number(self, key: str, value: str) -> str:
