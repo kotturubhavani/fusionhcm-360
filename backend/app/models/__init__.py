@@ -22,3 +22,5 @@ __all__ += ['ReportDefinition', 'ReportRun', 'ExtractDefinition', 'ExtractRun']
 
 from app.models.integrations import IntegrationDefinition, IntegrationRun, IntegrationRunItem
 __all__ += ['IntegrationDefinition','IntegrationRun','IntegrationRunItem']
+
+from app.models.ai import AIConversation, AIMessage, DocumentSource, Document, DocumentChunk, AIQueryAudit

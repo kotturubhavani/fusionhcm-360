@@ -248,6 +248,39 @@ The rerunnable seed creates Worker Snapshot File Export, Payroll Results File Ex
 
 Management routes: `GET/POST /integrations`, `GET/PATCH /integrations/{id}`, `POST /integrations/{id}/run`, `GET /integrations/runs`, `GET /integrations/runs/{id}`, `/items`, `/download`, and `POST /integrations/runs/{id}/retry`. Definition/run lists use offset/limit pagination. The UI provides conditional configuration forms, explicit run confirmation, safe credential references, status/counts, item errors, downloads and confirmed retries. Management inbound runs accept `records` or `csv_content` together with `request_key`.
 
+## AI assistant and policy library
+
+The read-only portfolio assistant combines authorized HCM queries with retrieval over synthetic policies. HR/ADMIN can search active workers, look up a worker's employment/payroll/FBP records, explain import row errors and inspect report, extract or integration run status. Employees can query only their linked worker and shared policies. Tool authorization runs independently of both intent routing and the model. No SQL generation, record mutation or model-directed tool execution is available. This is not Oracle AI compatibility or production HR, legal, payroll or benefits advice.
+
+The UI provides private conversation history, suggested questions, optional staff worker/job/run context, exact structured source values and expandable source excerpts. Policy Library is HR/ADMIN-only. The initial response pipeline is non-streaming. Each turn resolves its own worker/job context and rechecks current permissions; previous answers are not passed back as authoritative context. Conversations are private even between administrators. Staff history is hidden after role downgrade, and self-service history is hidden after account/person relinking.
+
+**Providers:** `AI_PROVIDER=mock` is the default. Mock mode is clearly labeled, renders actual authorized database records and uses deterministic hashed term vectors with a small synonym map for offline retrieval tests. It is not a learned semantic model. Set `AI_PROVIDER=openai` for real semantic embeddings and model-assisted evidence selection. `AI_MODEL` defaults to `gpt-4.1-mini`; `AI_EMBEDDING_MODEL` defaults to `text-embedding-3-small` with 256 dimensions. Configure temperature, timeout and maximum output tokens with the corresponding `AI_*` settings in `.env.example`. `AI_API_KEY_ENV` permits `OPENAI_API_KEY` or an `AI_PROVIDER_KEY_...` reference; its value comes only from the backend process environment. No key is sent to the frontend. Missing configured keys and provider failures fail closed; OpenAI mode never silently falls back to mock.
+
+The real adapter uses the [OpenAI Responses API](https://developers.openai.com/api/docs/guides/text) with `store=false` and [embeddings API](https://developers.openai.com/api/reference/resources/embeddings/methods/create). Enabling it sends the current question, bounded authorized source context and policy text for embeddings to OpenAI. Use synthetic data only. No prior chat history, credentials or arbitrary files are sent. Provider responses may select only known evidence IDs; unknown, duplicate or malformed references fail validation. The application renders exact source excerpts and structured Decimal strings, with vetted payroll/FBP explanations. This intentionally favors traceable evidence over free-form generated advice and prevents the model from inventing money values or citation content.
+
+**Storage and retrieval:** PostgreSQL owns conversations, messages, query audits, document sources, documents and text chunks. A local [Qdrant](https://qdrant.tech/documentation/quickstart/) container stores cosine vectors and opaque chunk IDs only. It binds to loopback and uses a separate persistent volume, leaving the PostgreSQL image/volume unchanged. This unauthenticated loopback setup is for a trusted single-developer machine, not a public deployment. PostgreSQL authorizes the candidate chunk IDs before every Qdrant query: active/indexed documents, active source, ALL versus STAFF audience, optional source/document filters and matching embedding-provider signature. Results are rechecked against the authorized set. `AI_TOP_K` and `AI_MIN_SCORE` control retrieval; low-score or irrelevant results return a no-evidence fallback. Scores are similarity measures, not calibrated confidence.
+
+Each provider/embedding model has a separate collection signature; changing providers/models requires explicit reindexing. Missing indexes return a safe error and can be rebuilt from retained text. PostgreSQL is authoritative across partial failures: vector points from a rolled-back upload are never eligible for retrieval. Reindexing upserts the same chunk IDs. No raw upload files are retained. The collection contains no policy text or employee records, and can be rebuilt by explicit reindexing; removing a collection does not remove source documents. At most 2,000 eligible chunks are searched per request; use a source/document filter for larger libraries.
+
+**Ingestion:** Upload PDF, UTF-8 TXT or Markdown with an ALL or STAFF audience. Defaults are 2 MiB per file, 40,000 extracted characters and 30 PDF pages. PDF extraction runs in a time-limited child process; encrypted, scanned or unparseable PDFs are rejected with a safe message. There is no OCR, macro execution or user-supplied filesystem path. Normalized text is split into 900-character windows with 150-character overlap. Credential-shaped text and common instruction-injection patterns are rejected; retrieved text remains untrusted regardless of pattern matching. The model cannot request tools or influence scope, and excerpts render as plain text. HR must still review policies before publishing to the chosen audience.
+
+Uploads are checksum-idempotent within a source. A failed index retains text with FAILED status for an explicit retry. Deactivation immediately removes a document from retrieval; activation requires reindexing. Historical messages retain the evidence snapshots shown at that time. No document/conversation hard-delete endpoint or automatic retention job is included. Do not upload real personal or proprietary documents.
+
+Explicit local setup from the repository root, then `backend/`:
+
+```bash
+docker compose up -d postgres qdrant
+cd backend
+python -m alembic upgrade head
+python scripts/seed_ai.py --actor-email admin.qa@fusionhcm.local
+```
+
+The actor must already be active HR/ADMIN. The seed creates no account, indexes the five files in `synthetic-data/policies/`, is safely rerunnable and never runs on startup. Reusable policies cover leave, remote work, payroll, benefits/FBP and employee transfers. All describe fictional Demo360 scenarios.
+
+API: `GET /ai/capabilities`, `POST /ai/chat`, `GET /ai/conversations`, `GET /ai/conversations/{id}`; HR/ADMIN use `GET/POST /ai/documents`, `GET/PATCH /ai/documents/{id}` and `POST /ai/documents/{id}/reindex`. Chat takes a UUID `request_key`, message and optional owned conversation, allowlisted tool, staff person number/job/run reference, row number, as-of date and document/source filters. Employee identifiers cannot broaden scope. Repeated request keys are rejected; after a network interruption, reload history before resending. Conversations are capped at 100 messages. Calls are bounded and synchronous under the existing simulator writer lock, suitable for local demonstrations rather than high-volume service.
+
+AI tests use real local PostgreSQL and isolated Qdrant collections with deterministic providers, plus mocked OpenAI HTTP contracts. Both containers must be running. They roll back database fixtures and remove test vector collections; no real API key is needed.
+
 ## Verification
 
 From `frontend/`:
@@ -275,4 +308,4 @@ Build output, virtual environments, dependency directories, Python caches, cover
 
 ## Planned capabilities
 
-Benefits-provider integration and AI/RAG remain future work. No real employee records or personal information should be used.
+Benefits-provider integration remains future work. No real employee records or personal information should be used.

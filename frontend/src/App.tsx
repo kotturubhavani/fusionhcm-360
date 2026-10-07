@@ -1,3 +1,5 @@
+import { AIClient } from './ai/api'
+import { AIRoutes } from './ai/pages'
 import { IntegrationsClient } from './integrations/api'
 import { IntegrationsRoutes } from './integrations/pages'
 import { AnalyticsClient } from './analytics/api'
@@ -44,11 +46,14 @@ export function Navigation({ staff }: { staff: boolean }) {
             ['/reports', 'Reports'],
             ['/extracts', 'Extracts'],
             ['/integrations', 'Integration Center'],
+            ['/ai', 'AI Assistant'],
+            ['/ai/documents', 'Policy Library'],
           ]
         : [
             ['/me', 'My employment'],
             ['/payroll/me', 'My payroll'],
             ['/fbp/me', 'My benefits'],
+            ['/ai', 'AI Assistant'],
           ]
       ).map(([to, text]) => (
         <NavLink
@@ -70,6 +75,7 @@ function Management({
   imports,
   analytics,
   integrations,
+  ai,
 }: {
   api: CoreHrClient
   payroll: PayrollClient
@@ -77,6 +83,7 @@ function Management({
   imports: ImportsClient
   analytics: AnalyticsClient
   integrations: IntegrationsClient
+  ai: AIClient
 }) {
   const loaded = useLoad(() => api.references(), [api])
   const [refs, setRefs] = useState<References | null>(null)
@@ -110,6 +117,7 @@ function Management({
         path="/integrations/*"
         element={<IntegrationsRoutes api={integrations} />}
       />
+      <Route path="/ai/*" element={<AIRoutes api={ai} staff />} />
       <Route path="/imports/*" element={<ImportsRoutes api={imports} />} />
       <Route path="/reports/*" element={<AnalyticsRoutes api={analytics} />} />
       <Route
@@ -128,6 +136,7 @@ export function Workspace({
   imports,
   analytics,
   integrations,
+  ai,
   logout,
   busy,
 }: {
@@ -138,6 +147,7 @@ export function Workspace({
   imports: ImportsClient
   analytics: AnalyticsClient
   integrations: IntegrationsClient
+  ai: AIClient
   logout: () => void
   busy: boolean
 }) {
@@ -188,10 +198,15 @@ export function Workspace({
               imports={imports}
               analytics={analytics}
               integrations={integrations}
+              ai={ai}
             />
           ) : (
             <Routes>
               <Route path="/me" element={<WorkerDetail api={api} self />} />
+              <Route
+                path="/ai/*"
+                element={<AIRoutes api={ai} staff={false} />}
+              />
               <Route
                 path="/payroll/*"
                 element={<PayrollRoutes api={payroll} hr={api} staff={false} />}
@@ -214,6 +229,7 @@ export function Workspace({
 export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
   const api = useMemo(() => new CoreHrClient(client), [client])
   const payroll = useMemo(() => new PayrollClient(client), [client])
+  const ai = useMemo(() => new AIClient(client), [client])
   const integrations = useMemo(() => new IntegrationsClient(client), [client])
   const analytics = useMemo(() => new AnalyticsClient(client), [client])
   const imports = useMemo(() => new ImportsClient(client), [client])
@@ -324,6 +340,7 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
         imports={imports}
         analytics={analytics}
         integrations={integrations}
+        ai={ai}
         payroll={payroll}
         logout={logout}
         busy={busy}

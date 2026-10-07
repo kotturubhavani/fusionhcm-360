@@ -132,6 +132,7 @@ describe('role-aware workspace', () => {
     render(
       <MemoryRouter initialEntries={['/workers/someone-else']}>
         <Workspace
+          ai={{} as import('./ai/api').AIClient}
           integrations={{} as import('./integrations/api').IntegrationsClient}
           analytics={
             new AnalyticsClient(new AuthClient('http://localhost:8000'))

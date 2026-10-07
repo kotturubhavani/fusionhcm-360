@@ -26,5 +26,14 @@ services:
       retries: 10
       start_period: 10s
 
+  qdrant:
+    image: qdrant/qdrant:v1.17.0
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - fusionhcm360_qdrant_data:/qdrant/storage
+
 volumes:
   fusionhcm360_postgres_data:
+  fusionhcm360_qdrant_data:

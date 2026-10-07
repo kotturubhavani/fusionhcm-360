@@ -319,6 +319,7 @@ it('employee direct URL redirects without integration calls', async () => {
   render(
     <MemoryRouter initialEntries={['/integrations']}>
       <Workspace
+        ai={{} as import('./ai/api').AIClient}
         user={{
           id: 'u',
           email: 'employee@example.test',
@@ -380,7 +381,9 @@ it('inbound FILE reads CSV and sends content without a local path', async () => 
   await waitFor(() =>
     expect(screen.getByRole('button', { name: 'Run Now' })).not.toBeDisabled(),
   )
-  fireEvent.submit(screen.getByRole('button', { name: 'Run Now' }).closest('form')!)
+  fireEvent.submit(
+    screen.getByRole('button', { name: 'Run Now' }).closest('form')!,
+  )
   await waitFor(() =>
     expect(execute).toHaveBeenCalledWith('d', {
       request_key: expect.any(String),

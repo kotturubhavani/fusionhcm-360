@@ -1,3 +1,4 @@
+from app.api.ai import router as ai_router
 from app.api.integrations import router as integrations_router
 from app.api.analytics import reports as reports_router, extracts as extracts_router
 from app.api.imports import router as imports_router
@@ -36,6 +37,7 @@ app.include_router(imports_router)
 app.include_router(reports_router)
 app.include_router(extracts_router)
 app.include_router(integrations_router)
+app.include_router(ai_router)
 app.add_exception_handler(HRError, hr_error_handler)
 
 
