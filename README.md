@@ -221,6 +221,33 @@ The idempotent seed adds three reports (Active Workforce by Department, Monthly 
 
 Report routes: `GET /reports/metadata`, `GET/POST /reports`, `GET/PATCH /reports/{id}`, `POST /reports/{id}/run`, `GET /reports/runs`, `GET /reports/runs/{id}`, `/results`, `/export.csv` and `/export.xlsx`. Extract routes: `GET/POST /extracts/definitions`, `GET/PATCH /extracts/definitions/{id}`, `POST /extracts/definitions/{id}/run`, `GET /extracts/runs`, `GET /extracts/runs/{id}` and `/download`. Lists/results are paginated. Repeated run requests create distinct audit runs; incremental repeats without changes produce empty output.
 
+## Integration Center
+
+HR/ADMIN can configure inbound/outbound integrations, monitor item outcomes and download generated files. This independent simulator does not claim Oracle Fusion or Oracle Integration Cloud compatibility. Employees have no management or artifact access. Definitions can be edited or deactivated; direction and business type are fixed after creation. PATCH accepts the complete editable definition.
+
+Outbound types are `WORKER_EXPORT`, `PAYROLL_EXPORT` and `FBP_EXPORT`, using local FILE (JSON/CSV) or HTTP_REST (POST JSON, one request per record). Workers use dated assignments and optional legal employer/business unit/department filters; current person/reference labels are used. Worker exports omit contact details and salary. Payroll exports use completed result snapshots and optional payroll code, period and run-number filters. FBP exports contain submitted/finalized assignment budgets and elected component totals. Amounts remain decimal strings. Business payloads use readable codes and person/assignment numbers.
+
+Inbound types are `PERSON_UPDATE`, `ASSIGNMENT_CHANGE` and `COMPENSATION_CHANGE`. They reuse Data Imports columns, parsing and Core HR validation; REST takes `{"records":[{"person_number":"SYNTHETIC_P01","preferred_name":"Synthetic"}]}` with string field values. FILE takes UTF-8 CSV. Assignment changes require a complete version; compensation history is separate. Each batch permits one operation per target. Successful changes and their item audit commit together; invalid items do not alter their target. Unknown fields reject the entire request before payload retention. Use synthetic data only.
+
+Management uses normal HR/ADMIN JWTs. Partner calls use `POST /integrations/inbound/{code}`, `X-Integration-Key` and an `Idempotency-Key`; employee JWTs do not grant partner access. FILE partner calls use `Content-Type: text/csv`; REST uses JSON. Inbound definitions require BEARER_ENV metadata. Administrators supply only a credential **reference**, matching `INTEGRATION_TOKEN_[A-Z0-9_]{1,64}`, explicitly allowlisted in `INTEGRATION_CREDENTIAL_ENV_KEYS` (a JSON list). Set its value in the backend process environment, not in frontend variables or definition fields. Values are compared securely and never returned or retained with runs; missing values fail closed. Authentication headers and partner response bodies are not logged or stored.
+
+HTTP destinations permit http/https without URL credentials, query strings or fragments. Private/loopback/link-local addresses are blocked, including DNS results; connections use the checked IP while HTTPS still verifies the original hostname. Redirects are not followed. `ALLOW_PRIVATE_INTEGRATION_TARGETS` defaults to False and should be enabled only in a local QA process for a local mock partner. Tests provide an isolated HTTP server fixture; there is no production mock route. Network operations use `INTEGRATION_HTTP_TIMEOUT_SECONDS` (default 5, maximum 15); DNS resolution follows the host OS resolver. A run stops starting new items after a 30-second delivery budget. Execution is synchronous under the shared simulator transaction lock, with at most `INTEGRATION_MAX_ITEMS` (default/maximum 100) and 1 MiB input. This is intended for small local demonstrations, not production throughput.
+
+Every management run requires a client-generated `request_key`; reusing it for that definition returns 409. Partner Idempotency-Key supplies the same guard. History captures the definition snapshot, requester or API trigger, counts, safe metadata, timestamps and item outcomes. Manual retry creates a new run from **failed items only**, preserves each delivery Idempotency-Key and links its parent; only one direct retry and at most three retry levels are allowed. Business scope and transport must remain unchanged; the endpoint/credential reference can be repaired. Runs failing before item creation have no retryable items: inspect the cause and explicitly start a fresh run.
+
+Delivery is **at least once**, not exactly once. HTTP delivery cannot be rolled back with PostgreSQL. A timeout or database/connection failure can leave delivery uncertain; inspect partner receipts before retrying or starting a new request. Partners must deduplicate delivery keys. Successful items are never copied into manual retries. No scheduler, infinite retry, payment instruction or automatic startup execution is included.
+
+FILE output uses application-generated UUID filenames in `local-data/integrations/`, ignored by Git; `INTEGRATION_OUTPUT_DIR` can configure local storage. Authenticated downloads require HR/ADMIN. CSV formula prefixes are escaped. Audit rows have no hard-delete API. Local files require retention management; a failed database commit can leave an orphan file. Explicit commands from `backend/`:
+
+```bash
+python scripts/seed_integrations.py
+python scripts/cleanup_integration_orphans.py --older-than-days 7
+```
+
+The rerunnable seed creates Worker Snapshot File Export, Payroll Results File Export and FBP Elections File Export definitions only. It preserves existing definitions and creates no runs. Cleanup only removes old unreferenced UUID output, retaining referenced artifacts.
+
+Management routes: `GET/POST /integrations`, `GET/PATCH /integrations/{id}`, `POST /integrations/{id}/run`, `GET /integrations/runs`, `GET /integrations/runs/{id}`, `/items`, `/download`, and `POST /integrations/runs/{id}/retry`. Definition/run lists use offset/limit pagination. The UI provides conditional configuration forms, explicit run confirmation, safe credential references, status/counts, item errors, downloads and confirmed retries. Management inbound runs accept `records` or `csv_content` together with `request_key`.
+
 ## Verification
 
 From `frontend/`:
@@ -248,4 +275,4 @@ Build output, virtual environments, dependency directories, Python caches, cover
 
 ## Planned capabilities
 
-Benefits-provider integration, Integration Center and AI/RAG remain future work. No real employee records or personal information should be used.
+Benefits-provider integration and AI/RAG remain future work. No real employee records or personal information should be used.

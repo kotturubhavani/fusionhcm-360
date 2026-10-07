@@ -1,3 +1,5 @@
+import { IntegrationsClient } from './integrations/api'
+import { IntegrationsRoutes } from './integrations/pages'
 import { AnalyticsClient } from './analytics/api'
 import { AnalyticsRoutes } from './analytics/pages'
 import { ImportsClient } from './imports/api'
@@ -41,6 +43,7 @@ export function Navigation({ staff }: { staff: boolean }) {
             ['/imports', 'Data Imports'],
             ['/reports', 'Reports'],
             ['/extracts', 'Extracts'],
+            ['/integrations', 'Integration Center'],
           ]
         : [
             ['/me', 'My employment'],
@@ -66,12 +69,14 @@ function Management({
   fbp,
   imports,
   analytics,
+  integrations,
 }: {
   api: CoreHrClient
   payroll: PayrollClient
   fbp: FbpClient
   imports: ImportsClient
   analytics: AnalyticsClient
+  integrations: IntegrationsClient
 }) {
   const loaded = useLoad(() => api.references(), [api])
   const [refs, setRefs] = useState<References | null>(null)
@@ -101,6 +106,10 @@ function Management({
         element={<PayrollRoutes api={payroll} hr={api} staff />}
       />
       <Route path="/fbp/*" element={<FbpRoutes api={fbp} hr={api} staff />} />
+      <Route
+        path="/integrations/*"
+        element={<IntegrationsRoutes api={integrations} />}
+      />
       <Route path="/imports/*" element={<ImportsRoutes api={imports} />} />
       <Route path="/reports/*" element={<AnalyticsRoutes api={analytics} />} />
       <Route
@@ -118,6 +127,7 @@ export function Workspace({
   fbp,
   imports,
   analytics,
+  integrations,
   logout,
   busy,
 }: {
@@ -127,6 +137,7 @@ export function Workspace({
   fbp: FbpClient
   imports: ImportsClient
   analytics: AnalyticsClient
+  integrations: IntegrationsClient
   logout: () => void
   busy: boolean
 }) {
@@ -176,6 +187,7 @@ export function Workspace({
               fbp={fbp}
               imports={imports}
               analytics={analytics}
+              integrations={integrations}
             />
           ) : (
             <Routes>
@@ -202,6 +214,7 @@ export function Workspace({
 export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
   const api = useMemo(() => new CoreHrClient(client), [client])
   const payroll = useMemo(() => new PayrollClient(client), [client])
+  const integrations = useMemo(() => new IntegrationsClient(client), [client])
   const analytics = useMemo(() => new AnalyticsClient(client), [client])
   const imports = useMemo(() => new ImportsClient(client), [client])
   const fbp = useMemo(() => new FbpClient(client), [client])
@@ -310,6 +323,7 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
         fbp={fbp}
         imports={imports}
         analytics={analytics}
+        integrations={integrations}
         payroll={payroll}
         logout={logout}
         busy={busy}

@@ -189,6 +189,7 @@ it.each(['/imports/job', '/reports/new', '/extracts/new'])(
     render(
       <MemoryRouter initialEntries={[path]}>
         <Workspace
+          integrations={{} as import('./integrations/api').IntegrationsClient}
           analytics={
             new AnalyticsClient(new AuthClient('http://localhost:8000'))
           }

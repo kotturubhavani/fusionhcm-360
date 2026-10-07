@@ -19,3 +19,6 @@ __all__ += ['ImportJob', 'ImportRow']
 
 from app.models.analytics import ReportDefinition, ReportRun, ExtractDefinition, ExtractRun
 __all__ += ['ReportDefinition', 'ReportRun', 'ExtractDefinition', 'ExtractRun']
+
+from app.models.integrations import IntegrationDefinition, IntegrationRun, IntegrationRunItem
+__all__ += ['IntegrationDefinition','IntegrationRun','IntegrationRunItem']

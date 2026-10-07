@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     analytics_max_rows: int = Field(default=5000, ge=1, le=20000)
     extract_output_dir: Path = PROJECT_ROOT / "local-data" / "extracts"
 
+    integration_output_dir: Path = PROJECT_ROOT / "local-data" / "integrations"
+    allow_private_integration_targets: bool = False
+    integration_credential_env_keys: list[str] = []
+    integration_http_timeout_seconds: float = Field(default=5, ge=0.1, le=15)
+    integration_max_items: int = Field(default=100, ge=1, le=100)
+
     # JWT
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
