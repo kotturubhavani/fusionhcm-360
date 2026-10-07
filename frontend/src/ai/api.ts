@@ -1,4 +1,4 @@
-﻿import type { AuthClient } from '../auth'
+import type { AuthClient } from '../auth'
 export interface Citation {
   id: string
   document_id: string
@@ -8,7 +8,20 @@ export interface Citation {
   text: string
   score: number
 }
+export interface AgentSection {
+  agent: string
+  tool: string
+  label: string
+  status: string
+  data: Record<string, unknown>
+  error: string | null
+  explanation?: string | null
+}
 export interface Details {
+  orchestrator_route?: string
+  selected_agents?: string[]
+  sections?: AgentSection[]
+  composition?: Record<string, unknown> | null
   query_type?: string
   tool?: string | null
   structured_data?: Record<string, unknown>

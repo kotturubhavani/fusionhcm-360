@@ -309,3 +309,17 @@ Build output, virtual environments, dependency directories, Python caches, cover
 ## Planned capabilities
 
 Benefits-provider integration remains future work. No real employee records or personal information should be used.
+
+### Controlled orchestration and evaluations
+
+A deterministic orchestrator selects up to four allowlisted sources across Core HR, Payroll, Benefits, Data Imports, Reporting, Integrations and Policies. Specialized agents use existing authorized read wrappers; the model cannot choose tools or perform writes. Cross-domain answers retain exact structured values, source sections and policy citations. The payroll/benefits comparison means people with any completed payroll result and an OPEN budget in the requested plan year, rather than an inferred eligibility decision. A failed source produces a partial answer when other verified evidence remains available.
+
+Audit metadata records the route, selected agents, tool names, typed filters, outcomes, elapsed times and citation IDs. It contains no model reasoning or internal prompts. Prompt checks supplement independent tool authorization and constrained evidence selection; they are not a claim of universal injection detection. No autonomous HR decisions or startup evaluations are performed.
+
+Run the deterministic synthetic evaluation suite from `backend` with PostgreSQL, Qdrant and the existing demo policies available:
+
+```powershell
+.venv\Scripts\python.exe scripts/evaluate_ai.py --hr-email admin.qa@fusionhcm.local --employee-email employee.qa@fusionhcm.local
+```
+
+The CLI requires existing staff and linked employee QA accounts and `AI_PROVIDER=mock`. It runs in a read-only database transaction and writes a summary to ignored `local-data/evals/`. See [evaluation scope and metrics](backend/evals/README.md). No evaluation API or employee-accessible evaluation controls are added.

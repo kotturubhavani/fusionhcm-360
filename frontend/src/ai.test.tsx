@@ -278,3 +278,64 @@ it('library load error and oversized upload', async () => {
   await screen.findByText('Document exceeds the upload size limit.')
   expect(upload).not.toHaveBeenCalled()
 })
+it('renders multiple domain sources and preserves useful partial results', () => {
+  render(
+    <Answer
+      content="Authorized sources"
+      details={{
+        status: 'PARTIAL',
+        selected_agents: ['PAYROLL_AGENT', 'BENEFITS_AGENT'],
+        sections: [
+          {
+            agent: 'PAYROLL_AGENT',
+            tool: 'get_my_payroll',
+            label: 'Payroll',
+            status: 'SUCCESS',
+            data: { net: '61108.33' },
+            error: null,
+          },
+          {
+            agent: 'BENEFITS_AGENT',
+            tool: 'get_my_fbp',
+            label: 'Benefits',
+            status: 'FAILED',
+            data: {},
+            error: 'Benefits source unavailable.',
+          },
+        ],
+        citations: [citation],
+      }}
+    />,
+  )
+  expect(screen.getByText('PAYROLL AGENT')).toBeTruthy()
+  expect(screen.getByText('BENEFITS AGENT')).toBeTruthy()
+  expect(
+    screen.getByRole('region', { name: 'Payroll source' }),
+  ).toHaveTextContent('61108.33')
+  expect(
+    screen.getByRole('region', { name: 'Benefits source' }),
+  ).toHaveTextContent('Benefits source unavailable.')
+  expect(screen.getByText(/Some sources could not complete/)).toBeTruthy()
+  expect(screen.getByText(citation.text)).toBeTruthy()
+  expect(screen.queryByText('agent_trace')).toBeNull()
+})
+it('employee cross-worker refusal displays without records or staff filters', async () => {
+  const api = client()
+  vi.spyOn(api, 'chat').mockRejectedValue(
+    new Error('Employees can query only their own linked worker.'),
+  )
+  render(
+    <MemoryRouter>
+      <Chat api={api} staff={false} />
+    </MemoryRouter>,
+  )
+  fireEvent.change(screen.getByLabelText('Your question'), {
+    target: { value: 'Show another worker payroll' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'only their own linked worker',
+  )
+  expect(screen.queryByLabelText('Person number')).toBeNull()
+  expect(screen.queryByRole('region', { name: 'Payroll source' })).toBeNull()
+})

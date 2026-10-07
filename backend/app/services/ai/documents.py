@@ -26,7 +26,8 @@ def require_staff(user):
     if not staff(user):raise AccessDenied('Document management requires HR or ADMIN.')
 
 SENSITIVE = re.compile(r'-----BEGIN .*PRIVATE KEY|\b(?:sk-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|ghp_[A-Za-z0-9]{30,})\b|(?:password|api[_ -]?key|authorization|access[_ -]?token)\s*[:=]\s*\S+',re.I)
-INJECTION = re.compile(r'ignore\s+(?:all\s+|previous\s+|system\s+)*instructions|system\s+prompt|reveal\s+(?:the\s+)?secret|<\|(?:system|im_start)|developer\s+message',re.I)
+from .guardrails import DOCUMENT_INJECTION as INJECTION, normalize
+
 
 def safe_input(value):
     if SENSITIVE.search(value):raise InvalidOperation('Do not submit credentials or private keys.')
@@ -51,7 +52,7 @@ def extract(filename,content):
     value=unicodedata.normalize('NFKC',value).replace('\r\n','\n').strip()
     if not 30<=len(value)<=40000:raise InvalidOperation('Extracted text must contain 30 to 40,000 characters.')
     safe_input(value)
-    if INJECTION.search(value):raise InvalidOperation('Document contains instruction-like content and requires review before indexing.')
+    if INJECTION.search(normalize(value)):raise InvalidOperation('Document contains instruction-like content and requires review before indexing.')
     return value,mime
 
 def chunk_text(value):
@@ -128,7 +129,7 @@ def retrieve(db,user,query,source_id=None,document_id=None):
         if str(hit['id']) not in lookup:continue
         c,d,src=lookup[str(hit['id'])]
         # Reapply trust checks even if an index was created by another process.
-        if INJECTION.search(c.text_content) or SENSITIVE.search(c.text_content):continue
+        if INJECTION.search(normalize(c.text_content)) or SENSITIVE.search(c.text_content):continue
         if settings.ai_provider=='mock' and not set(providers.terms(query))&set(providers.terms(c.text_content)):continue
         result.append({'id':str(c.id),'document_id':str(d.id),'document_name':d.filename,'source_name':src.name,'chunk_index':c.chunk_index,'text':c.text_content,'score':round(hit['score'],4)})
     return result

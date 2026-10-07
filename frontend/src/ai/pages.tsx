@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { useLoad } from '../components/useLoad'
@@ -51,7 +51,12 @@ export function Answer({
       <p className="whitespace-pre-wrap">{content}</p>
       <div className="flex gap-2 flex-wrap">
         {details.query_type && <Badge>{label(details.query_type)}</Badge>}
-        {details.tool && <Badge>{label(details.tool)}</Badge>}
+        {details.selected_agents?.map((agent) => (
+          <Badge key={agent}>{label(agent)}</Badge>
+        ))}
+        {!details.selected_agents?.length && details.tool && (
+          <Badge>{label(details.tool)}</Badge>
+        )}
         {details.provider && (
           <Badge>
             {details.provider === 'mock'
@@ -60,7 +65,41 @@ export function Answer({
           </Badge>
         )}
       </div>
-      {details.structured_data &&
+      {details.status === 'PARTIAL' && (
+        <Notice>
+          Some sources could not complete this question. Available records are
+          shown; missing results were not inferred.
+        </Notice>
+      )}
+      {details.composition && (
+        <section
+          className="rounded-lg bg-indigo-50 p-4"
+          aria-label="Combined result"
+        >
+          <h3>Combined result</h3>
+          <Values value={details.composition} />
+        </section>
+      )}
+      {details.sections?.map((section) => (
+        <section
+          key={section.tool}
+          aria-label={section.label + ' source'}
+          className="rounded-lg bg-slate-50 p-4 space-y-3"
+        >
+          <h3>{section.label}</h3>
+          <Badge>{section.status}</Badge>
+          {section.error && <Notice error>{section.error}</Notice>}
+          {section.status === 'EMPTY' && (
+            <p>No matching evidence was found for this source.</p>
+          )}
+          {Object.keys(section.data).length > 0 && (
+            <Values value={section.data} />
+          )}
+          {section.explanation && <p className="hint">{section.explanation}</p>}
+        </section>
+      ))}
+      {!details.sections?.length &&
+        details.structured_data &&
         Object.keys(details.structured_data).length > 0 && (
           <section
             aria-label="Structured source records"
@@ -109,13 +148,13 @@ export function Chat({ api, staff }: { api: AIClient; staff: boolean }) {
   const prompts = staff
     ? [
         'Show active workers in Engineering',
-        "Explain Cedar Synthetic's latest payroll",
+        "Show Cedar Synthetic's latest payroll and current FBP status.",
         'Which FBP workers have not submitted?',
         'What does the remote work policy say?',
       ]
     : [
         'What is my current salary?',
-        'Show my latest payroll',
+        'Show my latest payroll and current benefits.',
         'What benefits have I selected?',
         'What does the remote work policy say?',
       ]
@@ -176,7 +215,7 @@ export function Chat({ api, staff }: { api: AIClient; staff: boolean }) {
         setText('')
         list.reload()
       }
-      if (response.status !== 'SUCCESS')
+      if (response.status !== 'SUCCESS' && response.status !== 'PARTIAL')
         setError(
           response.error ?? 'The assistant could not complete this request.',
         )

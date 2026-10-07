@@ -3,11 +3,9 @@ from datetime import datetime,UTC
 from sqlalchemy import select,func
 from app import models as m
 from app.services.core_hr.common import atomic,NotFound,InvalidOperation,HRError
-from . import documents,tools,routing,providers
+from . import documents,orchestrator
 
-EXPLANATIONS={
- 'payroll':'Gross is earnings before deductions. Net is gross less the deductions listed in the saved result. These are simulator calculations, not tax or payroll advice.',
- 'fbp':'Allocated is the sum of saved component elections; remaining is the budget less allocated. OPEN budgets have not been submitted. This is a benefits-planning simulation, not benefits or tax advice.'}
+
 
 def scope(user):return 'STAFF' if documents.staff(user) else 'SELF'
 def conversation(db,user,identifier,lock=False):
@@ -32,51 +30,33 @@ def history(db,user,identifier):
 @atomic
 def chat(db,user,request):
     documents.authorized(user)
-    convo=None;kind='GENERAL_CHAT';tool=None
-    # Replays are rejected before provider work; writer lock serializes concurrent requests.
     previous=db.scalar(select(m.AIQueryAudit.id).where(m.AIQueryAudit.user_id==user.id,m.AIQueryAudit.details['request_key'].astext==str(request.request_key)))
     if previous:raise InvalidOperation('This request was already handled. Reload conversation history before retrying.')
+    convo=None
     try:
         documents.safe_input(request.message)
         if request.conversation_id:convo=conversation(db,user,request.conversation_id,lock=True)
-        kind,tool=routing.route(user,request)
-        data=tools.execute(db,user,tool,request) if tool else {}
-        evidence=documents.retrieve(db,user,request.message,request.source_id,request.document_id) if kind in ('DOCUMENT_RAG','HYBRID') else []
+        if convo and db.scalar(select(func.count()).select_from(m.AIMessage).where(m.AIMessage.conversation_id==convo.id))>=100:raise InvalidOperation('Conversation limit reached. Start a new conversation.')
+        result=orchestrator.run(db,user,request)
     except documents.AccessDenied as exc:
-        db.add(m.AIQueryAudit(user_id=user.id,query_type=kind,action=tool or 'ROUTE',status='DENIED',details={'request_key':str(request.request_key)}));db.flush()
-        return {'status':'DENIED','error':str(exc)}
+        db.add(m.AIQueryAudit(user_id=user.id,query_type='GUARDRAIL',action='ORCHESTRATE',status='DENIED',details={'request_key':str(request.request_key),'orchestrator_route':'DENIED','selected_agents':[],'agent_trace':[]}));db.flush()
+        return {'status':'DENIED','error':str(exc),'query_type':'GUARDRAIL','orchestrator_route':'DENIED','selected_agents':[],'agent_trace':[],'sections':[],'structured_data':{},'citations':[]}
     except HRError as exc:
-        # Validation/not-found errors are audited without retaining submitted text.
-        db.add(m.AIQueryAudit(user_id=user.id,query_type=kind,action=tool or 'RETRIEVE',status='FAILED',details={'request_key':str(request.request_key)}));db.flush()
-        return {'status':'FAILED','error':str(exc)}
-    except providers.ProviderError:
-        db.add(m.AIQueryAudit(user_id=user.id,query_type=kind,action='RETRIEVE',status='FAILED',details={'request_key':str(request.request_key)}));db.flush()
-        return {'status':'FAILED','error':'Document retrieval is unavailable. Check the provider/vector store and retry.'}
+        db.add(m.AIQueryAudit(user_id=user.id,query_type='VALIDATION',action='ORCHESTRATE',status='FAILED',details={'request_key':str(request.request_key)}));db.flush()
+        return {'status':'FAILED','error':str(exc),'selected_agents':[],'agent_trace':[],'citations':[],'structured_data':{}}
     if convo is None:
         convo=m.AIConversation(user_id=user.id,person_id=user.person_id,scope=scope(user),title=request.message.strip()[:100]);db.add(convo);db.flush()
     count=db.scalar(select(func.count()).select_from(m.AIMessage).where(m.AIMessage.conversation_id==convo.id))
-    if count>=100:raise InvalidOperation('Conversation limit reached. Start a new conversation.')
     db.add(m.AIMessage(conversation_id=convo.id,sequence_number=count+1,role='user',content=request.message,details={}))
-    status='SUCCESS';error=None;selected=[]
-    try:
-        # Bounded context is freshly authorized each turn. Prior answers are never tool input.
-        import json
-        if len(json.dumps(data,default=str))>24000:raise providers.ProviderError('Narrow this query to one worker or run.')
-        selection=providers.provider().select(request.message,[{'id':e['id'],'text':e['text']} for e in evidence],data)
-        by_id={e['id']:e for e in evidence}
-        if len(selection.selected_ids)!=len(set(selection.selected_ids)) or any(i not in by_id for i in selection.selected_ids):raise providers.ProviderError('Provider returned invalid evidence references.')
-        selected=[by_id[i] for i in selection.selected_ids]
-        answer='Here are the authorized source records.' if data else 'Relevant policy excerpts are shown below.' if selected else 'I could not find supporting evidence for that question. Try a specific worker, payroll, benefits or policy question.'
-        if kind=='GENERAL_CHAT':answer='I can look up authorized worker, payroll and benefits records, explain import errors, show run statuses and retrieve indexed policy excerpts. Ask a specific question or choose a suggested prompt.'
-        if tool and 'payroll' in tool:answer+='\n\n'+EXPLANATIONS['payroll']
-        if tool and 'fbp' in tool:answer+='\n\n'+EXPLANATIONS['fbp']
-    except providers.ProviderError:
-        status='FAILED';error='AI provider failed or returned invalid evidence. Please retry later.';answer=error;data={};selected=[]
-    details={'query_type':kind,'tool':tool,'structured_data':data,'citations':selected,'provider':settings_provider(),'status':status,'error':error,'request_key':str(request.request_key)}
-    message=m.AIMessage(conversation_id=convo.id,sequence_number=count+2,role='assistant',content=answer,details=details);db.add(message)
+    details={k:v for k,v in result.items() if k!='answer'}
+    details.update(provider=settings_provider(),request_key=str(request.request_key))
+    message=m.AIMessage(conversation_id=convo.id,sequence_number=count+2,role='assistant',content=result['answer'],details=details);db.add(message)
     convo.updated_at=datetime.now(UTC)
-    db.add(m.AIQueryAudit(user_id=user.id,conversation_id=convo.id,query_type=kind,action=tool or 'EVIDENCE_SELECTION',status=status,details={'provider':settings_provider(),'citation_count':len(selected),'request_key':str(request.request_key)}));db.flush()
-    return {'status':status,'error':error,'conversation_id':str(convo.id),'message_id':str(message.id),'answer':answer,**details}
+    audit_details={k:details[k] for k in ('provider','request_key','orchestrator_route','selected_agents','agent_trace')}
+    audit_details.update(outcome=result['status'],citation_ids=[c['id'] for c in result['citations']])
+    db.add(m.AIQueryAudit(user_id=user.id,conversation_id=convo.id,query_type=result['query_type'],action='ORCHESTRATE',status='SUCCESS' if result['status']=='SUCCESS' else 'FAILED',details=audit_details));db.flush()
+    return {'conversation_id':str(convo.id),'message_id':str(message.id),'answer':result['answer'],**details}
+
 
 def settings_provider():
     from app.core.config import settings

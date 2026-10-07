@@ -11,7 +11,7 @@ from app.services.imports.templates import TEMPLATES,required
 from .documents import authorized,staff,AccessDenied
 
 SELF={'get_my_worker_summary','get_my_payroll','get_my_fbp'}
-STAFF={'search_workers','get_worker_summary','get_payroll_result','get_payroll_history','get_fbp_status','get_import_job_status','get_report_run_status','get_extract_run_status','get_integration_run_status'}
+STAFF={'search_workers','get_worker_summary','get_payroll_result','get_payroll_history','get_fbp_status','get_import_job_status','get_report_run_status','get_extract_run_status','get_integration_run_status','get_payroll_population','get_unsubmitted_benefits'}
 
 def resolve_person(db,user,request):
     if not staff(user):
@@ -33,7 +33,7 @@ def summary(db,person_id,day):
     worker=worker_summary(db,person_id,day)
     return {'person_number':worker.person.person_number,'name':worker.person.first_name+' '+worker.person.last_name,'is_active':worker.person.is_active,'as_of':day.isoformat(),
         'assignments':[{'assignment_number':p.assignment.assignment_number,'employment_type':p.work_relationship.employment_type,'joining_date':str(p.work_relationship.start_date),
-        'status':p.version.status if p.version else None,'department':p.department.name if p.department else None,'job':p.job.name if p.job else None,
+        'status':p.version.status if p.version else None,'department':p.department.name if p.department else None,'job':p.job.name if p.job else None,'location':p.location.name if p.location else None,
         'annual_base_salary':str(p.compensation.annual_base_salary) if p.compensation else None,'currency':p.compensation.currency if p.compensation else None} for p in worker.placements]}
 
 def payroll(db,person_id,reference=None):
@@ -48,8 +48,11 @@ def payroll(db,person_id,reference=None):
             'lines':[{'code':l.code,'name':l.name,'type':l.line_type,'amount':str(l.amount)} for l in detail.lines]})
     return {'results':results,'limit':10,'order':'latest payment date first'}
 
-def fbp(db,person_id,question):
+def fbp(db,person_id,question,day=None):
     query=select(m.FBPWorkerBudget)
+    if 'current' in question.lower():
+        day=day or date.today()
+        query=query.join(m.FBPPlan,m.FBPWorkerBudget.plan_id==m.FBPPlan.id).where(m.FBPPlan.effective_from<=day,m.FBPPlan.effective_to>=day)
     if person_id:query=query.where(m.FBPWorkerBudget.person_id==person_id)
     if re.search(r'not submitted|unsubmitted|pending',question,re.I):query=query.where(m.FBPWorkerBudget.status=='OPEN')
     rows=db.scalars(query.order_by(m.FBPWorkerBudget.created_at.desc(),m.FBPWorkerBudget.id).limit(10)).all()
@@ -69,6 +72,7 @@ def execute(db,user,tool,request):
         if not user.person_id:raise NotFound('No worker is linked to this account.')
         person_id=user.person_id
     else:person_id=None
+    if tool in ('get_payroll_population','get_unsubmitted_benefits'):return population(db,tool,request.as_of or date.today())
     if tool=='search_workers':
         query=select(m.Person).where(m.Person.is_active.is_(True)).order_by(m.Person.person_number)
         workers=[];day=request.as_of or date.today()
@@ -87,10 +91,14 @@ def execute(db,user,tool,request):
         return summary(db,person_id or resolve_person(db,user,request),request.as_of or date.today())
     if tool in ('get_payroll_result','get_payroll_history','get_my_payroll'):
         if tool=='get_payroll_result' and request.reference_id:return payroll(db,None,request.reference_id)
-        return payroll(db,person_id or resolve_person(db,user,request))
+        data=payroll(db,person_id or resolve_person(db,user,request))
+        if 'latest' in request.message.lower() and data['results']:
+            latest=data['results'][0]['payment_date'];data['results']=[r for r in data['results'] if r['payment_date']==latest]
+            data['order']='latest payment date only'
+        return data
     if tool in ('get_fbp_status','get_my_fbp'):
-        if is_staff and not person_id and not request.person_number and re.search(r'workers|pending|not submitted|unsubmitted',request.message,re.I):return fbp(db,None,request.message)
-        return fbp(db,person_id or resolve_person(db,user,request),request.message)
+        if is_staff and not person_id and not request.person_number and re.search(r'workers|pending|not submitted|unsubmitted',request.message,re.I):return fbp(db,None,request.message,request.as_of)
+        return fbp(db,person_id or resolve_person(db,user,request),request.message,request.as_of)
     if tool=='get_import_job_status':
         if not request.reference_id:raise InvalidOperation('Select an import job ID and optional row number.')
         job=db.get(m.ImportJob,request.reference_id)
@@ -105,8 +113,30 @@ def execute(db,user,tool,request):
         return {'object_type':job.object_type,'status':job.status,'total_rows':job.total_rows,'rows':[{'row_number':r.row_number,'status':r.status,'error_code':r.error_code,'safe_error':r.error_message} for r in rows],
             'allowed_columns':TEMPLATES[job.object_type],'required_columns':required(job.object_type),'rules':'Use exact template columns, existing readable identifiers, ISO dates and nonnegative decimal salaries. Correct the failed row in a new import; do not repeat successful rows.'}
     model={'get_report_run_status':m.ReportRun,'get_extract_run_status':m.ExtractRun,'get_integration_run_status':m.IntegrationRun}[tool]
-    if not request.reference_id:raise InvalidOperation('Provide the run ID from its history page.')
-    row=db.get(model,request.reference_id)
+    if not request.reference_id:
+        if tool!='get_integration_run_status' or 'latest' not in request.message.lower():raise InvalidOperation('Provide the run ID from its history page.')
+        query=select(m.IntegrationRun)
+        if 'worker' in request.message.lower():query=query.where(m.IntegrationRun.definition_snapshot['integration_type'].astext=='WORKER_EXPORT')
+        row=db.scalar(query.order_by(m.IntegrationRun.started_at.desc(),m.IntegrationRun.id.desc()).limit(1))
+    else:row=db.get(model,request.reference_id)
     if not row:raise NotFound('Run not found.')
     allowed=('status','started_at','completed_at','row_count','records_read','records_succeeded','records_failed','error_message','safe_error_message')
-    return {k:str(getattr(row,k)) if k.endswith('_at') and getattr(row,k) else getattr(row,k) for k in allowed if hasattr(row,k)}
+    result={k:str(getattr(row,k)) if k.endswith('_at') and getattr(row,k) else getattr(row,k) for k in allowed if hasattr(row,k)}
+    if tool=='get_integration_run_status':
+        from app.services.integrations.service import items
+        result['failed_items']=[{'sequence_number':i.sequence_number,'business_reference':i.business_reference,'response_status':i.response_status,'safe_error':i.safe_error_message} for i in items(db,row.id) if i.status=='FAILED'][:10]
+        result['definition']=row.definition_snapshot.get('name')
+    return result
+
+
+def population(db,tool,day):
+    """Staff-only bounded sets for explicit intersection, without truncated joins."""
+    if tool=='get_payroll_population':
+        query=select(m.PayrollResult.person_number).join(m.PayrollRun,m.PayrollResult.payroll_run_id==m.PayrollRun.id).where(m.PayrollRun.status=='COMPLETED').distinct().order_by(m.PayrollResult.person_number)
+        people=list(db.scalars(query.limit(501)))
+        if len(people)>500:raise InvalidOperation('Comparison exceeds the 500-person simulator limit.')
+        return {'people':people,'scope':'People with any completed payroll result','complete':True}
+    query=select(m.FBPWorkerBudget,m.FBPPlan).join(m.FBPPlan,m.FBPWorkerBudget.plan_id==m.FBPPlan.id).where(m.FBPWorkerBudget.status=='OPEN',m.FBPPlan.effective_from<=day,m.FBPPlan.effective_to>=day).order_by(m.FBPWorkerBudget.person_number,m.FBPPlan.code,m.FBPWorkerBudget.assignment_number)
+    rows=db.execute(query.limit(501)).all()
+    if len(rows)>500:raise InvalidOperation('Comparison exceeds the 500-budget simulator limit.')
+    return {'budgets':[{'person_number':b.person_number,'assignment_number':b.assignment_number,'plan':p.code,'status':b.status} for b,p in rows],'as_of':str(day),'complete':True}
