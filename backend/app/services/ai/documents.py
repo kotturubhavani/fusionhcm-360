@@ -6,7 +6,7 @@ import sys
 import unicodedata
 from datetime import datetime,UTC
 from pathlib import PurePath
-from sqlalchemy import select
+from sqlalchemy import select,or_
 from app import models as m
 from app.core.config import settings
 from app.services.core_hr.common import atomic,get,InvalidOperation,Conflict
@@ -88,7 +88,13 @@ def index_document(db,user,document,chunks):
     try:
         embedded=provider.embed([c.text_content for c in chunks])
         vectors.upsert(provider.signature,chunks,embedded)
-        for chunk in chunks:chunk.embedding_reference=provider.signature
+        for chunk in chunks:
+            # Immutable text may have independent mock and hosted indexes.
+            spaces=set(chunk.details.get('embedding_spaces',[]))
+            if chunk.embedding_reference:spaces.add(chunk.embedding_reference)
+            spaces.add(provider.signature)
+            chunk.details={**chunk.details,'embedding_spaces':sorted(spaces)}
+            chunk.embedding_reference=provider.signature
         document.status='INDEXED';document.indexed_at=datetime.now(UTC);document.safe_error_message=None
         document.details={**document.details,'chunk_count':len(chunks),'embedding':provider.signature}
         audit(db,user,'INDEX_DOCUMENT','SUCCESS',{'document_id':str(document.id),'chunks':len(chunks)})
@@ -115,7 +121,7 @@ def set_active(db,user,identifier,active):
 
 def retrieve(db,user,query,source_id=None,document_id=None):
     authorized(user);provider=providers.provider()
-    statement=select(m.DocumentChunk,m.Document,m.DocumentSource).join(m.Document,m.DocumentChunk.document_id==m.Document.id).join(m.DocumentSource,m.Document.source_id==m.DocumentSource.id).where(m.Document.status=='INDEXED',m.DocumentSource.status=='ACTIVE',m.DocumentChunk.embedding_reference==provider.signature)
+    statement=select(m.DocumentChunk,m.Document,m.DocumentSource).join(m.Document,m.DocumentChunk.document_id==m.Document.id).join(m.DocumentSource,m.Document.source_id==m.DocumentSource.id).where(m.Document.status=='INDEXED',m.DocumentSource.status=='ACTIVE',or_(m.DocumentChunk.embedding_reference==provider.signature,m.DocumentChunk.details['embedding_spaces'].contains([provider.signature])))
     if not staff(user):statement=statement.where(m.DocumentSource.audience=='ALL')
     if source_id:statement=statement.where(m.Document.source_id==source_id)
     if document_id:statement=statement.where(m.Document.id==document_id)
@@ -123,7 +129,7 @@ def retrieve(db,user,query,source_id=None,document_id=None):
     if len(rows)>2000:raise InvalidOperation('Policy scope is too large; select a document or source filter.')
     if not rows:return []
     lookup={str(c.id):(c,d,src) for c,d,src in rows}
-    matches=vectors.search(provider.signature,provider.embed([query])[0],list(lookup),settings.ai_top_k,settings.ai_min_score)
+    matches=vectors.search(provider.signature,provider.embed([query],query=True)[0],list(lookup),settings.ai_top_k,settings.ai_min_score)
     result=[]
     for hit in matches:
         if str(hit['id']) not in lookup:continue

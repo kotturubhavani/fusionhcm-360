@@ -1,9 +1,8 @@
 """PostgreSQL + isolated Qdrant collection tests; no external LLM calls."""
-import io,json,os
+import io,json
 from uuid import uuid4,UUID
 from datetime import date
 import pytest
-import httpx
 from sqlalchemy import select,func,delete
 from app import models as m
 from app.core.config import settings
@@ -36,6 +35,28 @@ def test_mock_deterministic():
     p=providers.MockProvider();assert p.embed(['remote'])==p.embed(['remote'])
     assert p.embed(['home'])==p.embed(['remote'])
     assert p.select('question',[{'id':'a'}],{}).selected_ids==['a']
+
+
+def test_reindex_preserves_separate_embedding_spaces(db,admin,monkeypatch):
+    document=policy(db,admin)
+    chunks=list(db.scalars(select(m.DocumentChunk).where(m.DocumentChunk.document_id==document.id)))
+    snapshot=[(c.id,c.text_content) for c in chunks]
+    class OtherSpace(providers.MockProvider):
+        signature='synthetic-hosted-space'
+        def embed(self,texts,*,query=False):
+            return [v+[0.0]*512 for v in super().embed(texts,query=query)]
+    try:
+        with monkeypatch.context() as override:
+            override.setattr(providers,'provider',lambda:OtherSpace())
+            assert documents.reindex(db,admin,document.id).status=='INDEXED'
+            assert documents.retrieve(db,admin,'remote work policy')
+            assert vectors.request('GET','/collections/'+vectors.collection(OtherSpace.signature))['result']['config']['params']['vectors']['size']==768
+        assert [(c.id,c.text_content) for c in chunks]==snapshot
+        assert all(providers.MockProvider.signature in c.details['embedding_spaces'] for c in chunks)
+        assert documents.retrieve(db,admin,'remote work policy')
+        assert vectors.request('GET','/collections/'+vectors.collection(providers.MockProvider.signature))['result']['config']['params']['vectors']['size']==256
+    finally:
+        vectors.request('DELETE','/collections/'+vectors.collection(OtherSpace.signature),allow_missing=True)
 
 @pytest.mark.parametrize('text,expected',[
  ('Show active workers in Engineering','STRUCTURED_HCM_QUERY'),('What does the remote work policy say?','DOCUMENT_RAG'),('Explain my payroll and the payroll policy','HYBRID'),('Hello','GENERAL_CHAT')])
@@ -126,26 +147,6 @@ def test_index_failure_recoverable(db,admin,monkeypatch):
     doc=policy(db,admin);assert doc.status=='FAILED' and 'secret' not in doc.safe_error_message
     monkeypatch.setattr(providers.MockProvider,'embed',original)
     assert documents.reindex(db,admin,doc.id).status=='INDEXED'
-
-def test_real_provider_contract_and_timeout(monkeypatch):
-    monkeypatch.setenv('OPENAI_API_KEY','synthetic-provider-test')
-    calls=[]
-    class Client:
-        def __init__(self,**kw):assert kw['timeout']==settings.ai_timeout_seconds
-        def __enter__(self):return self
-        def __exit__(self,*a):pass
-        def post(self,url,**kw):
-            calls.append((url,kw['json']))
-            content={'data':[{'index':0,'embedding':[0.1]*256}]} if url.endswith('embeddings') else {'output':[{'type':'message','content':[{'type':'output_text','text':'{"selected_ids":[]}'}]}]}
-            return httpx.Response(200,json=content,request=httpx.Request('POST',url))
-    monkeypatch.setattr(providers.httpx,'Client',Client)
-    p=providers.OpenAIProvider();assert len(p.embed(['policy'])[0])==256
-    assert p.select('q',[],{}).selected_ids==[] and calls[1][1]['store'] is False
-    def timeout(*a,**kw):raise httpx.ReadTimeout('private details')
-    monkeypatch.setattr(Client,'post',timeout)
-    with pytest.raises(providers.ProviderError,match='timed out'):p.embed(['policy'])
-    monkeypatch.delenv('OPENAI_API_KEY')
-    with pytest.raises(providers.ProviderError,match='unavailable'):p.embed(['policy'])
 
 def test_payroll_fbp_and_import_tools(db,admin):
     result=db.scalar(select(m.PayrollResult).order_by(m.PayrollResult.person_number))

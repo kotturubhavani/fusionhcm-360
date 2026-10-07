@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,10 +25,12 @@ class Settings(BaseSettings):
     integration_http_timeout_seconds: float = Field(default=5, ge=0.1, le=15)
     integration_max_items: int = Field(default=100, ge=1, le=100)
 
-    ai_provider: Literal["mock", "openai"] = "mock"
-    ai_model: str = "gpt-4.1-mini"
-    ai_embedding_model: str = "text-embedding-3-small"
-    ai_api_key_env: str = Field(default="OPENAI_API_KEY", pattern=r"^(OPENAI_API_KEY|AI_PROVIDER_KEY_[A-Z0-9_]+)$")
+    ai_provider: Literal["mock", "gemini"] = "mock"
+    ai_model: str = Field(default="gemini-3.5-flash-lite", pattern=r"^gemini-[a-z0-9.-]+$")
+    ai_embedding_model: str = Field(default="gemini-embedding-001", pattern=r"^gemini-embedding-[a-z0-9.-]+$")
+    ai_embedding_dimensions: Literal[768, 1536, 3072] = 768
+    ai_api_key_env: Literal["GEMINI_API_KEY"] = "GEMINI_API_KEY"
+    gemini_api_key: SecretStr | None = Field(default=None, exclude=True, repr=False)
     ai_temperature: float = Field(default=0, ge=0, le=1)
     ai_timeout_seconds: float = Field(default=15, ge=1, le=30)
     ai_max_tokens: int = Field(default=500, ge=100, le=2000)

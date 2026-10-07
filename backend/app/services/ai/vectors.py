@@ -16,9 +16,14 @@ def request(method,path,body=None,allow_missing=False):
     except Exception:raise ProviderError('Document vector store is unavailable. Please retry later.') from None
 
 def upsert(signature,chunks,vectors):
+    if not vectors or len(chunks)!=len(vectors) or not vectors[0] or any(len(v)!=len(vectors[0]) for v in vectors):
+        raise ProviderError('Invalid vector batch.')
     name=collection(signature)
-    if request('GET','/collections/'+name,allow_missing=True) is None:
-        request('PUT','/collections/'+name,{'vectors':{'size':256,'distance':'Cosine'}})
+    existing=request('GET','/collections/'+name,allow_missing=True)
+    if existing is None:
+        request('PUT','/collections/'+name,{'vectors':{'size':len(vectors[0]),'distance':'Cosine'}})
+    elif existing['result']['config']['params']['vectors']['size']!=len(vectors[0]):
+        raise ProviderError('Policy vector dimensions do not match. Use a separate embedding collection.')
     request('PUT','/collections/'+name+'/points?wait=true',{'points':[{'id':str(chunk.id),'vector':vector} for chunk,vector in zip(chunks,vectors,strict=True)]})
 
 def search(signature,vector,allowed_ids,limit,threshold):
