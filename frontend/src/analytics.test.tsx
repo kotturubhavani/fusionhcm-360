@@ -1,4 +1,4 @@
-﻿import { expect, it, vi } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { AuthClient } from './auth'
@@ -30,7 +30,7 @@ const metadata: Metadata = {
 const definition: Definition = {
   id: 'd',
   code: 'SYNTH',
-  name: 'Synthetic workforce',
+  name: 'Workforce Assignment Summary',
   domain: 'CORE_HR_WORKERS',
   selected_columns: ['person_number'],
   filters: [],
@@ -44,7 +44,7 @@ const run: Run = {
   started_at: '2026-01-01T00:00:00Z',
   completed_at: '2026-01-01T00:00:01Z',
   error_message: null,
-  definition_snapshot: { name: 'Synthetic workforce' },
+  definition_snapshot: { name: 'Workforce Assignment Summary' },
 }
 const client = () =>
   new AnalyticsClient(new AuthClient('http://localhost:8000'))
@@ -66,7 +66,7 @@ it.each([true, false])('definition list extract=%s', async (extract) => {
     </MemoryRouter>,
   )
   expect(
-    await screen.findByRole('link', { name: 'Synthetic workforce' }),
+    await screen.findByRole('link', { name: 'Workforce Assignment Summary' }),
   ).toBeTruthy()
 })
 it('builder saves allowed columns, filters and sorting', async () => {
@@ -86,7 +86,7 @@ it('builder saves allowed columns, filters and sorting', async () => {
     target: { value: 'SYNTH' },
   })
   fireEvent.change(screen.getByLabelText('Name'), {
-    target: { value: 'Synthetic workforce' },
+    target: { value: 'Workforce Assignment Summary' },
   })
   fireEvent.click(screen.getByRole('button', { name: 'Add filter' }))
   fireEvent.change(screen.getByLabelText('Value 1'), {
@@ -135,7 +135,7 @@ it('extract create and explicit incremental run', async () => {
     target: { value: 'SYNTH' },
   })
   fireEvent.change(screen.getByLabelText('Name'), {
-    target: { value: 'Synthetic' },
+    target: { value: 'Nikhil' },
   })
   fireEvent.click(screen.getByRole('button', { name: 'Save definition' }))
   await screen.findByRole('button', { name: 'Run now' })
@@ -206,7 +206,7 @@ it('run history and loading/error states', async () => {
   )
   expect(screen.getByRole('status')).toBeTruthy()
   expect(
-    await screen.findByRole('link', { name: 'Synthetic workforce' }),
+    await screen.findByRole('link', { name: 'Workforce Assignment Summary' }),
   ).toBeTruthy()
 })
 it('safe errors in report list', async () => {

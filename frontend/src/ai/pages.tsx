@@ -60,7 +60,7 @@ export function Answer({
         {details.provider && (
           <Badge>
             {details.provider === 'mock'
-              ? 'Deterministic demo'
+              ? 'Deterministic responses'
               : 'AI evidence selection'}
           </Badge>
         )}
@@ -148,7 +148,7 @@ export function Chat({ api, staff }: { api: AIClient; staff: boolean }) {
   const prompts = staff
     ? [
         'Show active workers in Engineering',
-        "Show Cedar Synthetic's latest payroll and current FBP status.",
+        "Show Nikhil Varma's latest payroll and current FBP status.",
         'Which FBP workers have not submitted?',
         'What does the remote work policy say?',
       ]
@@ -231,7 +231,7 @@ export function Chat({ api, staff }: { api: AIClient; staff: boolean }) {
         title="AI Assistant"
         description={
           staff
-            ? 'Read-only HCM questions and grounded policy lookup.'
+            ? 'Read-only worker records and policy search.'
             : 'Your own employment records and shared synthetic policies.'
         }
       >
@@ -297,11 +297,10 @@ export function Chat({ api, staff }: { api: AIClient; staff: boolean }) {
           >
             {!messages.length && (
               <>
-                <h2>Ask about your HCM workspace</h2>
+                <h2>Ask a question</h2>
                 <p className="hint">
-                  Each question is checked against your current permissions.
-                  This assistant does not change records. Include the worker or
-                  job reference in each relevant question.
+                  Records are read-only. Include a worker or run reference when
+                  needed.
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {prompts.map((p) => (

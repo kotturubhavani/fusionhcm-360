@@ -4,9 +4,9 @@ import { AuthClient } from './auth.ts'
 
 const user = {
   id: '1',
-  first_name: 'Test',
-  last_name: 'User',
-  email: 'test@example.com',
+  first_name: 'Anusha',
+  last_name: 'Reddy',
+  email: 'anusha.reddy@example.com',
   roles: ['EMPLOYEE'],
 }
 const json = (body, status = 200) =>

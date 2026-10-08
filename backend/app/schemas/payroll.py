@@ -26,7 +26,7 @@ class DefinitionCreate(Contract):
     @model_validator(mode='after')
     def rates(self):
         if self.retirement_rate + self.withholding_rate > 1:
-            raise ValueError('Combined demo deduction rates cannot exceed 1')
+            raise ValueError('Combined deduction rates cannot exceed 1')
         return self
 
 

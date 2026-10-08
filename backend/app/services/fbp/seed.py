@@ -8,7 +8,7 @@ from app.services.core_hr.common import atomic, InvalidOperation
 from app.services.fbp import service as f
 
 PREFIX='DEMO360_'
-COMPONENTS=[('FLEX','Flexible lifestyle benefit','BENEFIT'),('LEARNING','Learning allowance','ALLOWANCE'),('WELLNESS','Wellness benefit','BENEFIT'),('COMMUTE','Commute reimbursement','REIMBURSEMENT')]
+COMPONENTS=[('FLEX','Meal Benefit','BENEFIT'),('LEARNING','Learning Allowance','ALLOWANCE'),('WELLNESS','Wellness Allowance','BENEFIT'),('COMMUTE','Transport Allowance','REIMBURSEMENT')]
 
 
 @atomic
@@ -31,7 +31,7 @@ def seed_demo(db):
                 if budget.status in ('SUBMITTED','FINALIZED') and view.remaining!=0:raise InvalidOperation('Demo allocation history is incomplete.')
         return {'created':False,'plans':2}
     for year in (2025,2026):
-        plan=f.create_plan(db,s.PlanCreate(code=PREFIX+f'FBP{year}',name=f'Synthetic annual benefits {year}',legal_employer_id=employer.id,
+        plan=f.create_plan(db,s.PlanCreate(code=PREFIX+f'FBP{year}',name=f'Annual Benefits {year}',legal_employer_id=employer.id,
             plan_year=year,effective_from=date(year,1,1),effective_to=date(year,12,31),currency='INR'))
         comps=[f.create_component(db,plan.id,s.ComponentCreate(code=code,name=name,description='Synthetic flexible benefit; no statutory or tax treatment.',component_type=kind,max_amount='999999999999.99',display_order=index)) for index,(code,name,kind) in enumerate(COMPONENTS)]
         f.open_plan(db,plan.id);f.generate_budgets(db,plan.id)

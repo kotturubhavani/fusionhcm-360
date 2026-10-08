@@ -9,15 +9,9 @@ from pwdlib.hashers.argon2 import Argon2Hasher
 from app.core.config import settings
 
 
-# ---------------------------------------------------------------------------
-# Password hashing
-# ---------------------------------------------------------------------------
-
 _password_hash = PasswordHash((Argon2Hasher(),))
 
-# Precomputed Argon2 hash used to perform comparable password-hashing work
-# when an email is not found, reducing timing differences. Generated once;
-# the original plaintext is not needed or stored.
+# Unknown accounts perform the same Argon2 work as failed password checks.
 _DUMMY_HASH = (
     "$argon2id$v=19$m=65536,t=3,p=4"
     "$Xcz5aJ4V6Rt6mIv53rXyng$JWqkCh3MX3HaxjXgavjeD8K2c+9+01t7eK3RdTGKpmY"
@@ -33,17 +27,9 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 def dummy_verify(password: str) -> None:
-    """Perform a real Argon2 verification against a dummy hash.
-
-    Call this when a login email is not found to reduce timing differences
-    compared with a real failed verification.
-    """
+    """Reduce login timing differences for unknown accounts."""
     _password_hash.verify(password, _DUMMY_HASH)
 
-
-# ---------------------------------------------------------------------------
-# JWT
-# ---------------------------------------------------------------------------
 
 TOKEN_TYPE_ACCESS = "access"
 TOKEN_TYPE_REFRESH = "refresh"
@@ -92,11 +78,7 @@ def create_refresh_token(subject: str) -> str:
 
 
 def decode_token(token: str, expected_type: str) -> dict[str, Any]:
-    """Decode and validate a JWT.
-
-    Raises TokenError for any validation failure so callers never
-    handle raw PyJWT exceptions or see internal details.
-    """
+    """Validate a JWT and expose only TokenError on failure."""
     try:
         payload = jwt.decode(
             token,

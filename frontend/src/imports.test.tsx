@@ -13,7 +13,7 @@ import { ImportDashboard, NewImport, ImportDetail } from './imports/pages'
 const job: ImportJob = {
   id: 'job',
   object_type: 'WORKER_HIRE',
-  original_filename: 'synthetic.csv',
+  original_filename: 'person-updates.csv',
   status: 'VALIDATED',
   total_rows: 2,
   valid_rows: 1,
@@ -53,7 +53,7 @@ it.each([true, false])('import navigation staff=%s', (staff) => {
       <Navigation staff={staff} />
     </MemoryRouter>,
   )
-  expect(Boolean(screen.queryByRole('link', { name: 'Data Imports' }))).toBe(
+  expect(Boolean(screen.queryByRole('link', { name: 'Imports' }))).toBe(
     staff,
   )
 })
@@ -66,7 +66,7 @@ it('renders history and pagination', async () => {
     </MemoryRouter>,
   )
   expect(
-    await screen.findByRole('link', { name: 'synthetic.csv' }),
+    await screen.findByRole('link', { name: 'person-updates.csv' }),
   ).toBeTruthy()
   expect(list).toHaveBeenCalledWith(0)
   expect(
@@ -103,7 +103,7 @@ it('uploads multipart only after explicit submission and handles template downlo
     await screen.findByRole('button', { name: 'Download template' }),
   )
   await waitFor(() => expect(create).toHaveBeenCalled())
-  const file = new File(['person_number\nSYNTH'], 'sample.csv', {
+  const file = new File(['person_number\nSYNTH'], 'worker-hires.csv', {
     type: 'text/csv',
   })
   fireEvent.change(screen.getByLabelText('CSV file'), {
@@ -197,7 +197,7 @@ it.each(['/imports/job', '/reports/new', '/extracts/new'])(
           user={{
             id: 'u',
             email: 'synthetic@example.com',
-            first_name: 'Synthetic',
+            first_name: 'Nikhil',
             last_name: 'Employee',
             roles: ['EMPLOYEE'],
           }}
@@ -210,7 +210,7 @@ it.each(['/imports/job', '/reports/new', '/extracts/new'])(
         />
       </MemoryRouter>,
     )
-    expect(screen.queryByRole('link', { name: 'Data Imports' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Imports' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Import detail' })).toBeNull()
     await screen.findByText(/No linked person/)
   },

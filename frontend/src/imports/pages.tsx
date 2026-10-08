@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { useLoad } from '../components/useLoad'
@@ -28,8 +28,8 @@ export function ImportDashboard({ api }: { api: ImportsClient }) {
   return (
     <>
       <PageTitle
-        title="Data Imports"
-        description="Upload, preview and explicitly process Core HR changes."
+        title="Imports"
+        description="Upload, validate and process Core HR changes."
       >
         <Link className="primary" to="/imports/new">
           New import

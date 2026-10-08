@@ -47,7 +47,7 @@
     @apply min-h-screen lg:flex;
   }
   .sidebar {
-    @apply bg-slate-900 text-slate-200 p-5 lg:fixed lg:inset-y-0 lg:w-60 lg:flex lg:flex-col;
+    @apply bg-slate-900 text-slate-200 p-5 lg:overflow-y-auto lg:fixed lg:inset-y-0 lg:w-60 lg:flex lg:flex-col;
   }
   .brand {
     @apply flex items-center gap-3 text-lg font-semibold text-white;
@@ -62,13 +62,13 @@
     @apply inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-teal-700 text-lg font-bold text-white;
   }
   .nav-caption {
-    @apply mt-10 mb-3 px-3 text-[10px] font-semibold tracking-[0.15em] text-slate-500;
+    @apply mt-6 mb-3 px-3 text-[10px] font-semibold tracking-[0.15em] text-slate-500;
   }
   nav {
     @apply flex flex-wrap gap-1 lg:flex-col;
   }
   .nav-link {
-    @apply rounded-lg px-3 py-3 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white;
+    @apply rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white;
   }
   .nav-link.selected {
     @apply bg-teal-800 text-white;
@@ -151,8 +151,6 @@
   }
   .login-page {
     @apply flex min-h-screen items-center justify-center px-5 py-12;
-    background:
-      radial-gradient(ellipse at top left, #ccfbf1, transparent 50%), #f8fafc;
   }
   .skip-link {
     @apply sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:bg-white focus:p-3;

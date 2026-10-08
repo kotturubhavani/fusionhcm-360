@@ -109,7 +109,7 @@ def populate_results(db, run, period, definition):
             continue
         lines, gross, deductions, net = calculated
         if net < 0:
-            raise InvalidOperation('Rounded deductions exceed gross pay. Review the demo rates.')
+            raise InvalidOperation('Rounded deductions exceed gross pay. Review the configured rates.')
         result = m.PayrollResult(payroll_run_id=run.id, person_id=person.id, work_relationship_id=relationship.id,
             assignment_id=assignment.id, person_number=person.person_number,
             worker_name=f'{person.first_name} {person.last_name}', assignment_number=assignment.assignment_number,

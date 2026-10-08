@@ -22,7 +22,7 @@ def seed_demo(db):
     definition = db.scalar(select(m.PayrollDefinition).where(m.PayrollDefinition.code == PREFIX + 'PAYROLL'))
     created = definition is None
     if created:
-        definition = p.create_definition(db, s.DefinitionCreate(code=PREFIX + 'PAYROLL', name='Synthetic Meridian monthly payroll',
+        definition = p.create_definition(db, s.DefinitionCreate(code=PREFIX + 'PAYROLL', name='Asterion India Monthly Payroll',
             legal_employer_id=employer.id, country_code='IN', currency='INR', retirement_rate='0.0500', withholding_rate='0.1000', standard_allowance='1000.00'))
     elif definition.legal_employer_id != employer.id or definition.currency != 'INR':
         raise InvalidOperation('Existing demo payroll definition does not match the demo employer/currency.')

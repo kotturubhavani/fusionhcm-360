@@ -4,7 +4,6 @@ import json
 import math
 import os
 import re
-from typing import Protocol
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
 from app.core.config import settings
@@ -15,11 +14,6 @@ class ProviderError(Exception):
 class Selection(BaseModel):
     model_config = ConfigDict(extra='forbid')
     selected_ids: list[str] = Field(max_length=5)
-
-class Provider(Protocol):
-    signature: str
-    def embed(self, texts: list[str], *, query: bool = False) -> list[list[float]]: ...
-    def select(self, question: str, evidence: list[dict], structured: dict) -> Selection: ...
 
 STOP = set('a an the is are was were be and or of to for in on at from with what does do say about tell me my our how can i it this that policy policies please show explain'.split())
 SYNONYMS = {'wfh':'remote','home':'remote','telework':'remote','vacation':'leave','holiday':'leave','benefits':'fbp','benefit':'fbp','salary':'payroll','pay':'payroll'}

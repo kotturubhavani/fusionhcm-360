@@ -2,6 +2,7 @@
 from datetime import datetime,UTC
 from sqlalchemy import select,func
 from app import models as m
+from app.core.config import settings
 from app.services.core_hr.common import atomic,NotFound,InvalidOperation,HRError
 from . import documents,orchestrator
 
@@ -49,15 +50,10 @@ def chat(db,user,request):
     count=db.scalar(select(func.count()).select_from(m.AIMessage).where(m.AIMessage.conversation_id==convo.id))
     db.add(m.AIMessage(conversation_id=convo.id,sequence_number=count+1,role='user',content=request.message,details={}))
     details={k:v for k,v in result.items() if k!='answer'}
-    details.update(provider=settings_provider(),request_key=str(request.request_key))
+    details.update(provider=settings.ai_provider,request_key=str(request.request_key))
     message=m.AIMessage(conversation_id=convo.id,sequence_number=count+2,role='assistant',content=result['answer'],details=details);db.add(message)
     convo.updated_at=datetime.now(UTC)
     audit_details={k:details[k] for k in ('provider','request_key','orchestrator_route','selected_agents','agent_trace')}
     audit_details.update(outcome=result['status'],citation_ids=[c['id'] for c in result['citations']])
     db.add(m.AIQueryAudit(user_id=user.id,conversation_id=convo.id,query_type=result['query_type'],action='ORCHESTRATE',status='SUCCESS' if result['status']=='SUCCESS' else 'FAILED',details=audit_details));db.flush()
     return {'conversation_id':str(convo.id),'message_id':str(message.id),'answer':result['answer'],**details}
-
-
-def settings_provider():
-    from app.core.config import settings
-    return settings.ai_provider

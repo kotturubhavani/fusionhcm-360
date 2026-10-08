@@ -1,4 +1,4 @@
-"""Core HR reference data. Worker and compensation models are added separately."""
+"""Core HR reference data."""
 
 from datetime import datetime
 from uuid import UUID
@@ -66,7 +66,7 @@ class Department(ReferenceFields, Base):
     __tablename__ = "departments"
     __table_args__ = (
         *_reference_constraints(__tablename__, department=True),
-        # Target key for the approved future assignment department/BU ownership FK.
+        # Composite key enforces assignment department/business-unit ownership.
         UniqueConstraint("id", "business_unit_id", name="uq_departments_id_business_unit"),
     )
 

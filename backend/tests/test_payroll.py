@@ -8,7 +8,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from app import models as m
 from app.schemas import payroll as s
-from app.services.payroll import service as p, rules, demo
+from app.services.payroll import service as p, rules, seed
 from app.services.core_hr import employment as e
 from app.services.core_hr.common import Conflict, InvalidOperation
 from test_core_hr import db, refs, client, headers, request, version
@@ -16,7 +16,7 @@ from test_core_hr import db, refs, client, headers, request, version
 
 @pytest.fixture
 def definition(db, refs):
-    return p.create_definition(db, s.DefinitionCreate(code=uuid4().hex[:24], name='Synthetic test payroll',
+    return p.create_definition(db, s.DefinitionCreate(code=uuid4().hex[:24], name='Asterion India Monthly Payroll',
         legal_employer_id=refs['legal_employer_id'], country_code='IN', currency='INR', standard_allowance='1000.00'))
 
 
@@ -34,7 +34,7 @@ def test_definition_uniqueness_and_employer_scope(db, refs, definition):
     with pytest.raises(Conflict):
         p.create_definition(db, s.DefinitionCreate(code='OTHER', name='Duplicate employer', legal_employer_id=refs['legal_employer_id'], country_code='IN', currency='INR'))
     with db.begin_nested():
-        other=m.LegalEmployer(code=uuid4().hex[:20].upper(),name='Synthetic other',country_code='IN');db.add(other);db.flush()
+        other=m.LegalEmployer(code=uuid4().hex[:20].upper(),name='Business Operations',country_code='IN');db.add(other);db.flush()
         with pytest.raises(Conflict):
             p.create_definition(db,s.DefinitionCreate(code=definition.code,name='Duplicate code',legal_employer_id=other.id,country_code='IN',currency='INR'))
     with pytest.raises(InvalidOperation):
@@ -50,7 +50,7 @@ def test_period_contracts(definition, change):
 
 @pytest.mark.parametrize('change', [{'retirement_rate':0.05},{'standard_allowance':True},{'withholding_rate':'NaN'}, {'retirement_rate':'0.6','withholding_rate':'0.5'}, {'standard_allowance':'-1'}, {'withholding_rate':'0.12345'}])
 def test_decimal_contracts(refs, change):
-    with pytest.raises(ValidationError): s.DefinitionCreate(code='TEST',name='Test',legal_employer_id=refs['legal_employer_id'],country_code='IN',currency='INR',**change)
+    with pytest.raises(ValidationError): s.DefinitionCreate(code='TEST',name='India Monthly Payroll',legal_employer_id=refs['legal_employer_id'],country_code='IN',currency='INR',**change)
 
 
 def test_overlap(db, definition):
@@ -69,8 +69,9 @@ def test_full_month_totals_lines_and_immutable_snapshot(db, refs, definition):
     detail=p.result_detail(db,row)
     assert {line.code:line.amount for line in detail.lines}=={'BASE_PAY':Decimal('10000.00'),'STANDARD_ALLOWANCE':Decimal('1000.00'),'DEMO_RETIREMENT':Decimal('500.00'),'DEMO_WITHHOLDING':Decimal('1100.00')}
     assert row.eligible_days==row.period_days==31
-    db.get(m.Person,hired.person.id).first_name='Changed';db.flush()
-    assert row.worker_name != 'Changed Synthetic'
+    db.get(m.Person,hired.person.id).first_name='Naveen';db.flush()
+    assert row.worker_name == 'Nikhil Varma'
+    assert db.get(m.Person,hired.person.id).first_name == 'Naveen'
     assert p.run_detail(db,run.id).gross_pay==row.gross_pay
     with pytest.raises(Conflict):p.process(db,pp.id)
     assert db.scalar(select(func.count()).select_from(m.PayrollRun).where(m.PayrollRun.pay_period_id==pp.id))==1
@@ -114,8 +115,8 @@ def test_mid_month_compensation_and_status_segments(db,refs,definition):
 
 def test_currency_failure_rolls_back_partial_results_and_retry(db,refs,definition):
     from app.schemas.core_hr import PersonCreate
-    e.hire(db,request(refs,person=PersonCreate(person_number='AA'+uuid4().hex[:10],first_name='Good',last_name='Synthetic')))
-    bad=e.hire(db,request(refs,currency='USD',person=PersonCreate(person_number='ZZ'+uuid4().hex[:10],first_name='Bad',last_name='Synthetic')))
+    e.hire(db,request(refs,person=PersonCreate(person_number='AA'+uuid4().hex[:10],first_name='Akhil',last_name='Varma')))
+    bad=e.hire(db,request(refs,currency='USD',person=PersonCreate(person_number='ZZ'+uuid4().hex[:10],first_name='Meghana',last_name='Chowdary')))
     pp=period(db,definition)
     failed=p.process(db,pp.id)
     assert failed.status=='FAILED' and pp.status=='OPEN' and results(db,failed)==[]
@@ -182,13 +183,13 @@ def test_employee_self_only(client,db,refs,definition):
 
 
 def test_seed_idempotency(db,monkeypatch):
-    from app.services.core_hr import demo as hr_demo
+    from app.services.core_hr import seed as hr_seed
     prefix='T'+uuid4().hex[:6].upper()+'_'
-    monkeypatch.setattr(hr_demo,'PREFIX',prefix);monkeypatch.setattr(demo,'PREFIX',prefix)
-    hr_demo.seed_demo(db)
-    assert demo.seed_demo(db)['created']
+    monkeypatch.setattr(hr_seed,'PREFIX',prefix);monkeypatch.setattr(seed,'PREFIX',prefix)
+    hr_seed.seed_demo(db)
+    assert seed.seed_demo(db)['created']
     before={model.__tablename__:db.scalar(select(func.count()).select_from(model)) for model in [m.PayrollDefinition,m.PayPeriod,m.PayrollRun,m.PayrollResult,m.PayrollResultLine]}
-    assert not demo.seed_demo(db)['created']
+    assert not seed.seed_demo(db)['created']
     assert before=={model.__tablename__:db.scalar(select(func.count()).select_from(model)) for model in [m.PayrollDefinition,m.PayPeriod,m.PayrollRun,m.PayrollResult,m.PayrollResultLine]}
 
 
@@ -246,21 +247,21 @@ def test_rounded_net_never_negative(db,refs,definition):
 def test_paid_leave_and_other_employer_exclusion(db,refs,definition):
     hired=e.hire(db,request(refs))
     e.change_version(db,hired.assignment.id,version(hired,effective_from=date(2025,1,1),status='ON_LEAVE'))
-    other=m.LegalEmployer(code=uuid4().hex[:20].upper(),name='Different Synthetic',country_code='IN');db.add(other);db.flush()
+    other=m.LegalEmployer(code=uuid4().hex[:20].upper(),name='Asterion Business Services Pvt. Ltd.',country_code='IN');db.add(other);db.flush()
     e.hire(db,request({**refs,'legal_employer_id':other.id}))
     run=p.process(db,period(db,definition).id)
     assert len(results(db,run))==1 and results(db,run)[0].eligible_days==31
 
 
 def test_seed_rejects_missing_history(db,monkeypatch):
-    from app.services.core_hr import demo as hr_demo
+    from app.services.core_hr import seed as hr_seed
     prefix='T'+uuid4().hex[:6].upper()+'_'
-    monkeypatch.setattr(hr_demo,'PREFIX',prefix);monkeypatch.setattr(demo,'PREFIX',prefix)
-    hr_demo.seed_demo(db);demo.seed_demo(db)
+    monkeypatch.setattr(hr_seed,'PREFIX',prefix);monkeypatch.setattr(seed,'PREFIX',prefix)
+    hr_seed.seed_demo(db);seed.seed_demo(db)
     definition=db.scalar(select(m.PayrollDefinition).where(m.PayrollDefinition.code==prefix+'PAYROLL'))
     open_period=db.scalar(select(m.PayPeriod).where(m.PayPeriod.payroll_definition_id==definition.id,m.PayPeriod.status=='OPEN'))
     db.delete(open_period);db.flush()
-    with pytest.raises(InvalidOperation):demo.seed_demo(db)
+    with pytest.raises(InvalidOperation):seed.seed_demo(db)
 
 
 def test_monthly_rounding_at_half_cent(db,refs,definition):

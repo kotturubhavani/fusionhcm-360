@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import {
   Link,
@@ -318,7 +318,7 @@ export function Definitions({
                     maxLength={3}
                   />
                   <Field
-                    label="Demo retirement rate (0–1)"
+                    label="Retirement contribution rate (0–1)"
                     name="retirement_rate"
                     value="0.05"
                     required
@@ -326,7 +326,7 @@ export function Definitions({
                     inputMode="decimal"
                   />
                   <Field
-                    label="Demo withholding rate (0–1)"
+                    label="Income tax withholding rate (0–1)"
                     name="withholding_rate"
                     value="0.10"
                     required
@@ -370,7 +370,7 @@ export function Definitions({
                     <th>Payroll</th>
                     <th>Legal employer</th>
                     <th>Currency</th>
-                    <th>Demo rates</th>
+                    <th>Illustrative rates</th>
                     <th>Allowance</th>
                     <th>Status</th>
                   </tr>
@@ -551,9 +551,9 @@ export function Periods({ api }: { api: PayrollClient }) {
                 <h2>Process {selected.period_name}</h2>
                 <p className="text-sm mb-4">
                   This snapshots eligible assignments and their compensation
-                  using the configured demo rules. Completed results cannot be
-                  recalculated. Failed attempts save no partial results and can
-                  be retried.
+                  using the configured illustrative rules. Completed results
+                  cannot be recalculated. Failed attempts save no partial
+                  results and can be retried.
                 </p>
                 <label className="flex gap-3 text-sm mb-4">
                   <input type="checkbox" required />I confirm processing this
@@ -745,7 +745,7 @@ export function RunPage({ api }: { api: PayrollClient }) {
               are unpaid. Excluded counts cover overlapping candidate
               assignments only.
             </p>
-            <h2 className="mt-5">Applied demo rules</h2>
+            <h2 className="mt-5">Applied calculation rules</h2>
             <Facts
               items={Object.entries(load.data.detail.run.rules_snapshot).map(
                 ([key, value]) => [
@@ -784,7 +784,7 @@ export function ResultPage({
     <>
       <PageTitle
         title={self ? 'My payroll result' : 'Payroll result'}
-        description="Saved earnings, demo deductions and net pay."
+        description="Saved earnings, deductions and net pay."
       />
       <Link className="link" to={self ? '/payroll/me' : '/payroll'}>
         Back to payroll
@@ -815,13 +815,12 @@ export function ResultPage({
           </section>
           {(['EARNING', 'DEDUCTION'] as const).map((type) => (
             <section className="panel" key={type}>
-              <h2>{type === 'EARNING' ? 'Earnings' : 'Demo deductions'}</h2>
+              <h2>{type === 'EARNING' ? 'Earnings' : 'Deductions'}</h2>
               <div className="table-wrap">
                 <table>
                   <thead>
                     <tr>
                       <th>Line</th>
-                      <th>Code</th>
                       <th>Amount</th>
                     </tr>
                   </thead>
@@ -831,7 +830,6 @@ export function ResultPage({
                       .map((line) => (
                         <tr key={line.id}>
                           <td>{line.name}</td>
-                          <td>{line.code}</td>
                           <td>
                             {salary(line.amount, load.data!.result.currency)}
                           </td>

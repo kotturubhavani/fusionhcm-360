@@ -11,7 +11,7 @@ from openpyxl import load_workbook
 from app import models as m
 from app.core.config import settings
 from app.schemas import analytics as s
-from app.services.analytics import reports as r,extracts as e,data,demo
+from app.services.analytics import reports as r,extracts as e,data,seed
 from app.services.core_hr import employment,records
 from app.schemas import core_hr as hr
 from app.services.core_hr.common import Conflict,InvalidOperation
@@ -20,8 +20,8 @@ from test_core_hr import db,refs,client,headers,request
 @pytest.fixture(autouse=True)
 def output_dir(tmp_path,monkeypatch):monkeypatch.setattr(settings,'extract_output_dir',tmp_path)
 
-def report(**kwargs):return s.ReportCreate(**(dict(code=uuid4().hex[:24],name='Synthetic report',domain='CORE_HR_WORKERS',selected_columns=['person_number','annual_base_salary'])|kwargs))
-def extract(**kwargs):return s.ExtractCreate(**(dict(code=uuid4().hex[:24],name='Synthetic extract',extract_type='WORKER_CHANGES',output_format='JSON')|kwargs))
+def report(**kwargs):return s.ReportCreate(**(dict(code=uuid4().hex[:24],name='Workforce Assignment Summary',domain='CORE_HR_WORKERS',selected_columns=['person_number','annual_base_salary'])|kwargs))
+def extract(**kwargs):return s.ExtractCreate(**(dict(code=uuid4().hex[:24],name='Worker Changes Export',extract_type='WORKER_CHANGES',output_format='JSON')|kwargs))
 
 @pytest.mark.parametrize('change',[
  {'domain':'SQL'},{'selected_columns':['password_hash']},{'selected_columns':['person_number','person_number']},
@@ -60,7 +60,7 @@ def test_full_incremental_and_failed_watermark(db,refs,monkeypatch):
  first=e.run(db,d.id,s.ExtractRequest(mode='FULL'));assert first.status=='COMPLETED' and first.row_count==1
  assert len(json.loads(e.download(db,first.id)[1].read_text()))==1
  assert e.run(db,d.id,s.ExtractRequest(mode='INCREMENTAL')).row_count==0
- person=db.get(m.Person,h.person.id);person.preferred_name='Synthetic changed';person.updated_at=datetime.now(UTC);db.flush()
+ person=db.get(m.Person,h.person.id);person.preferred_name='Sai Kiran';person.updated_at=datetime.now(UTC);db.flush()
  changed=e.run(db,d.id,s.ExtractRequest(mode='INCREMENTAL'));assert changed.row_count==1
  old=d.last_successful_run_at
  def fail(*a,**k):raise OSError('private path')
@@ -93,7 +93,7 @@ def test_all_domains_and_seed(db):
   rd=r.create_report(db,report(domain=domain,selected_columns=columns));assert r.run_report(db,rd.id,s.ReportRequest()).status=='COMPLETED'
  for kind in ('WORKER_SNAPSHOT','PAYROLL_RESULTS','FBP_ELECTIONS'):
   d=e.create(db,extract(extract_type=kind));assert e.run(db,d.id,s.ExtractRequest()).status=='COMPLETED'
- demo.seed(db);before=db.scalar(select(func.count()).select_from(m.ReportDefinition));assert demo.seed(db)==0;assert db.scalar(select(func.count()).select_from(m.ReportDefinition))==before
+ seed.seed(db);before=db.scalar(select(func.count()).select_from(m.ReportDefinition));assert seed.seed(db)==0;assert db.scalar(select(func.count()).select_from(m.ReportDefinition))==before
 
 
 def test_safe_failure(db,monkeypatch):

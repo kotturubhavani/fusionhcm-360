@@ -1,8 +1,4 @@
-"""Authentication service layer.
-
-All functions operate at the domain level. No HTTPException is raised here.
-HTTP status mapping is the responsibility of the API layer.
-"""
+"""Authentication and tokens; the API maps domain errors to HTTP."""
 
 from dataclasses import dataclass
 from uuid import UUID
@@ -25,10 +21,6 @@ from app.core.security import (
 from app.models.user import Role, User, UserRole
 from app.schemas.auth import RegisterRequest
 
-
-# ---------------------------------------------------------------------------
-# Domain exceptions
-# ---------------------------------------------------------------------------
 
 class AuthServiceError(Exception):
     """Base class for auth service errors."""
@@ -54,12 +46,7 @@ class InvalidRefreshTokenError(AuthServiceError):
     """The refresh token is missing, expired, or invalid."""
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
 def _normalize_email(email: str) -> str:
-    """Strip whitespace and lowercase for consistent storage and lookup."""
     return email.strip().lower()
 
 
@@ -72,16 +59,8 @@ def _get_role(db: Session, name: str) -> Role:
     return role
 
 
-# ---------------------------------------------------------------------------
-# Public service functions
-# ---------------------------------------------------------------------------
-
 def register_user(db: Session, payload: RegisterRequest) -> User:
-    """Register a new user and assign the EMPLOYEE role.
-
-    Role assignment is not caller-controlled. Every registration receives
-    exactly EMPLOYEE regardless of request content.
-    """
+    """Register with EMPLOYEE only; callers cannot choose roles."""
     email = _normalize_email(str(payload.email))
 
     existing = db.execute(
@@ -101,7 +80,7 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
     db.add(user)
 
     try:
-        db.flush()  # populate user.id; raises IntegrityError on constraint violation
+        db.flush()
         db.add(UserRole(user_id=user.id, role_id=employee_role.id))
         db.commit()
     except IntegrityError as exc:
@@ -128,11 +107,7 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User:
-    """Verify credentials and return the authenticated User with roles loaded.
-
-    Unknown email and wrong password produce the same exception to prevent
-    user enumeration. Inactive accounts are rejected after credential check.
-    """
+    """Use the same error for unknown accounts and incorrect passwords."""
     normalized = _normalize_email(email)
 
     user = db.execute(
@@ -163,10 +138,6 @@ def get_user_by_id(db: Session, user_id: UUID) -> User | None:
     ).scalar_one_or_none()
 
 
-# ---------------------------------------------------------------------------
-# Token helpers
-# ---------------------------------------------------------------------------
-
 @dataclass
 class TokenPair:
     access_token: str
@@ -175,10 +146,7 @@ class TokenPair:
 
 
 def issue_token_pair(user: User) -> TokenPair:
-    """Derive current role names from the loaded user and issue both tokens.
-
-    Does not persist tokens. No HTTP or cookie handling.
-    """
+    """Issue tokens using the user's current roles."""
     role_names = [r.name for r in user.roles]
     return TokenPair(
         access_token=create_access_token(subject=str(user.id), roles=role_names),
@@ -188,14 +156,7 @@ def issue_token_pair(user: User) -> TokenPair:
 
 
 def refresh_access_token(db: Session, refresh_token: str) -> tuple[str, int]:
-    """Validate a refresh token string and issue a new access token.
-
-    Accepts the raw refresh token string. Decoding and type validation happen
-    here so the API layer only passes the cookie value through.
-
-    Returns (new_access_token, expires_in_seconds).
-    Refresh token rotation is not implemented at this stage.
-    """
+    """Return an access token and lifetime in seconds; refresh tokens are not rotated."""
     try:
         payload = decode_token(refresh_token, expected_type=TOKEN_TYPE_REFRESH)
     except TokenError as exc:

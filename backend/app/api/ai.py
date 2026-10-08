@@ -39,7 +39,7 @@ async def body(request,limit):
 @router.get('/capabilities')
 def capabilities(user:m.User=Depends(get_current_user)):
     documents.authorized(user)
-    return {'provider':settings.ai_provider,'mode':'Deterministic demo' if settings.ai_provider=='mock' else 'AI evidence selection','staff':documents.staff(user),'document_max_bytes':settings.ai_document_max_bytes,'streaming':False}
+    return {'provider':settings.ai_provider,'mode':'Deterministic responses' if settings.ai_provider=='mock' else 'AI evidence selection','staff':documents.staff(user),'document_max_bytes':settings.ai_document_max_bytes,'streaming':False}
 
 @router.post('/chat')
 async def chat(request:Request,user:m.User=Depends(get_current_user),db:Session=Depends(get_db)):

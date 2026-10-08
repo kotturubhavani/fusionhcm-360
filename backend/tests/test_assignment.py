@@ -33,11 +33,11 @@ def insert(conn, model, **values):
 def reference(conn, model, **extra):
     if model in (LegalEmployer, Location):
         extra['country_code'] = 'IN'
-    return insert(conn, model, code='T' + uuid4().hex[:25].upper(), name='Test reference', **extra)
+    return insert(conn, model, code='T' + uuid4().hex[:25].upper(), name='Corporate Functions', **extra)
 
 
 def assignment_values(conn):
-    person = insert(conn, Person, person_number='P' + uuid4().hex[:25].upper(), first_name='Test', last_name='Person')
+    person = insert(conn, Person, person_number='P' + uuid4().hex[:25].upper(), first_name='Harsha', last_name='Vardhan')
     employer = reference(conn, LegalEmployer)
     relationship = insert(conn, WorkRelationship, person_id=person, legal_employer_id=employer, employment_type='REGULAR', start_date=DAY)
     return dict(work_relationship_id=relationship, assignment_number='A' + uuid4().hex[:25].upper(), start_date=DAY)
@@ -114,7 +114,7 @@ def test_version_unique_dates_self_manager_and_department_ownership(connection):
     reject(connection, AssignmentVersion.__table__.insert().values(**{**payload, 'effective_to': DAY}), 'ck_assignment_versions_dates')
     reject(connection, AssignmentVersion.__table__.insert().values(**{**payload, 'manager_assignment_id': payload['assignment_id']}), 'ck_assignment_versions_manager')
     reject(connection, AssignmentVersion.__table__.insert().values(**{**payload, 'business_unit_id': reference(connection, BusinessUnit)}), 'fk_assignment_versions_department_business_unit', '23503')
-    # Same-day periods and overlaps are allowed here; service-level rules are deferred.
+    # These table constraints allow overlaps; employment services enforce timeline rules.
     insert(connection, AssignmentVersion, **{**payload, 'effective_to': payload['effective_from']})
 
 

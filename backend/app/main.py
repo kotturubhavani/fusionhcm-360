@@ -17,7 +17,7 @@ from app.core.config import settings
 app = FastAPI(
     title="FusionHCM 360 API",
     version="0.1.0",
-    description="Backend API for the FusionHCM 360 portfolio project.",
+    description="HCM simulation API for synthetic workforce data.",
 )
 
 app.add_middleware(

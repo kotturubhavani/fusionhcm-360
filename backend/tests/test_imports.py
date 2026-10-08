@@ -3,17 +3,16 @@ import csv
 import io
 from uuid import uuid4
 import pytest
-from sqlalchemy import select,func,text
+from sqlalchemy import select,text
 from app import models as m
 from app.core.config import settings
 from app.services.imports import service as f,templates,operations
-from app.services.core_hr import employment as e
 from app.services.core_hr.common import Conflict,InvalidOperation
 from test_core_hr import db,refs,client,headers,counts
 
 
 def hire_row(db,refs,**changes):
-    row=dict(person_number=uuid4().hex[:24],first_name='Import',last_name='Synthetic',employment_type='REGULAR',start_date='2024-01-01',assignment_number=uuid4().hex[:24],work_time_type='FULL_TIME',annual_base_salary='100000.25',currency='INR')
+    row=dict(person_number=uuid4().hex[:24],first_name='Pranavi',last_name='Rao',employment_type='REGULAR',start_date='2024-01-01',assignment_number=uuid4().hex[:24],work_time_type='FULL_TIME',annual_base_salary='100000.25',currency='INR')
     for key,model in [('legal_employer',m.LegalEmployer),('business_unit',m.BusinessUnit),('department',m.Department),('job',m.Job),('grade',m.Grade),('location',m.Location)]:
         row[key+'_code']=db.get(model,refs[key+'_id']).code
     return {**row,**changes}
@@ -25,7 +24,7 @@ def content(kind,entries):
 
 
 def upload(db,entries,kind='WORKER_HIRE'):
-    return f.upload(db,kind,'synthetic.csv',content(kind,entries),None)
+    return f.upload(db,kind,'person-updates.csv',content(kind,entries),None)
 
 
 @pytest.mark.parametrize('data',[
@@ -43,8 +42,8 @@ def test_limits_and_filename(db,refs,monkeypatch):
     monkeypatch.setattr(settings,'import_max_file_bytes',5*1024*1024)
     monkeypatch.setattr(settings,'import_max_rows',1)
     with pytest.raises(InvalidOperation):templates.parse('PERSON_UPDATE',b'person_number,first_name\nx,a\ny,b')
-    job=f.upload(db,'WORKER_HIRE','../../synthetic.csv',data,None)
-    assert job.original_filename=='synthetic.csv'
+    job=f.upload(db,'WORKER_HIRE','../../person-updates.csv',data,None)
+    assert job.original_filename=='person-updates.csv'
     with pytest.raises(InvalidOperation):f.upload(db,'WORKER_HIRE','bad.exe',data,None)
 
 
@@ -86,7 +85,7 @@ def test_duplicates_and_mixed(db,refs):
 
 
 def test_department_context(db,refs):
-    unit=m.BusinessUnit(code=uuid4().hex[:24],name='Synthetic other');db.add(unit);db.flush()
+    unit=m.BusinessUnit(code=uuid4().hex[:24],name='Business Operations');db.add(unit);db.flush()
     job=upload(db,[hire_row(db,refs,business_unit_code=unit.code)]);f.validate(db,job.id)
     assert job.invalid_rows==1
 

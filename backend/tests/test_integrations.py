@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from app import models as m
 from app.core.config import settings
 from app.schemas import integrations as s
-from app.services.integrations import service as f, security, demo, payloads
+from app.services.integrations import service as f, security, seed, payloads
 from app.services.core_hr import employment
 from app.services.core_hr.common import Conflict, InvalidOperation
 from test_core_hr import db, refs, client, headers, request
@@ -22,7 +22,7 @@ def isolate(tmp_path,monkeypatch):
     monkeypatch.setenv('INTEGRATION_TOKEN_TEST','synthetic-test-token')
 
 def definition(**kwargs):
-    return s.DefinitionCreate(**(dict(code=uuid4().hex[:24],name='Synthetic integration',direction='OUTBOUND',integration_type='WORKER_EXPORT',transport_type='FILE')|kwargs))
+    return s.DefinitionCreate(**(dict(code=uuid4().hex[:24],name='Worker Master Outbound',direction='OUTBOUND',integration_type='WORKER_EXPORT',transport_type='FILE')|kwargs))
 def run_request(**kwargs):return s.RunRequest(request_key=uuid4().hex,**kwargs)
 def inbound(kind='PERSON_UPDATE',**kwargs):return definition(**(dict(direction='INBOUND',integration_type=kind,transport_type='HTTP_REST',configuration={'auth_type':'BEARER_ENV','credential_env_key':'INTEGRATION_TOKEN_TEST'})|kwargs))
 
@@ -116,12 +116,12 @@ def test_timeout(db,partner,monkeypatch):
 
 def test_inbound_person_mixed_csv_and_replay(db,refs):
     h=employment.hire(db,request(refs));d=f.create(db,inbound())
-    run=f.execute(db,d.id,run_request(records=[{'person_number':h.person.person_number,'preferred_name':'Synthetic renamed'},{'person_number':'MISSING_SYNTHETIC','first_name':'Missing'}]))
+    run=f.execute(db,d.id,run_request(records=[{'person_number':h.person.person_number,'preferred_name':'Nikhil'},{'person_number':'MISSING_SYNTHETIC','first_name':'Missing'}]))
     assert run.status=='COMPLETED_WITH_ERRORS' and run.records_succeeded==1
-    assert db.get(m.Person,h.person.id).preferred_name=='Synthetic renamed'
+    assert db.get(m.Person,h.person.id).preferred_name=='Nikhil'
     retry=f.retry(db,run.id,run_request());assert retry.records_read==1 and retry.status=='FAILED'
     csvdef=f.create(db,inbound(transport_type='FILE',output_format='CSV'))
-    csv=f.execute(db,csvdef.id,run_request(csv_content=f'person_number,preferred_name\n{h.person.person_number},CSV Synthetic\n'))
+    csv=f.execute(db,csvdef.id,run_request(csv_content=f'person_number,preferred_name\n{h.person.person_number},Nikhil Varma\n'))
     assert csv.status=='COMPLETED'
     with pytest.raises(InvalidOperation):f.execute(db,d.id,run_request(records=[{'password':'not-allowed'}]))
     with pytest.raises(InvalidOperation):f.execute(db,d.id,run_request(records=[{'person_number':'DUP'},{'person_number':'DUP'}]))
@@ -146,7 +146,7 @@ def test_api_auth_and_safe_validation(client,db,refs):
     value=inbound().model_dump(mode='json');res=client.post('/integrations',headers=auth,json=value);assert res.status_code==201,res.text
     path='/integrations/inbound/'+value['code']
     assert client.post(path,headers=emp,json={'records':[]}).status_code==401
-    response=client.post(path,headers={'X-Integration-Key':'synthetic-test-token','Idempotency-Key':'partner-test'},json={'records':[{'person_number':h.person.person_number,'preferred_name':'Partner synthetic'}]})
+    response=client.post(path,headers={'X-Integration-Key':'synthetic-test-token','Idempotency-Key':'partner-test'},json={'records':[{'person_number':h.person.person_number,'preferred_name':'Nikhil Varma'}]})
     assert response.status_code==200 and response.json()['status']=='COMPLETED',response.text
     assert 'synthetic-test-token' not in response.text
     assert client.post(path,headers={'X-Integration-Key':'synthetic-test-token','Idempotency-Key':'partner-test'},json={'records':[{'person_number':h.person.person_number}]}).status_code==409
@@ -154,7 +154,7 @@ def test_api_auth_and_safe_validation(client,db,refs):
     response=client.post('/integrations',headers=auth,json=value);assert response.status_code==422 and 'secret-not-echoed' not in response.text
 
 def test_seed_unique_disabled_and_path(db):
-    demo.seed(db);assert demo.seed(db)==0
+    seed.seed(db);assert seed.seed(db)==0
     value=definition();f.create(db,value)
     with pytest.raises(Conflict):f.create(db,value)
     d=f.create(db,definition(is_active=False))

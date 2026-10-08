@@ -27,7 +27,7 @@ def connection():
 
 
 def person_values():
-    return dict(person_number="P" + uuid4().hex[:25].upper(), first_name="Test", last_name="Person")
+    return dict(person_number="P" + uuid4().hex[:25].upper(), first_name="Harsha", last_name="Vardhan")
 
 
 def insert_person(conn):
@@ -36,13 +36,13 @@ def insert_person(conn):
 
 def relationship_values(conn):
     employer_id = conn.execute(LegalEmployer.__table__.insert().values(
-        code="L" + uuid4().hex[:25].upper(), name="Test employer", country_code="IN"
+        code="L" + uuid4().hex[:25].upper(), name="Asterion Digital Technologies Pvt. Ltd.", country_code="IN"
     ).returning(LegalEmployer.id)).scalar_one()
     return dict(person_id=insert_person(conn), legal_employer_id=employer_id, employment_type="REGULAR", start_date=date(2026, 1, 1))
 
 
 def user_values():
-    return dict(email=f"{uuid4().hex}@example.com", password_hash="test-only-placeholder", first_name="Test", last_name="Account")
+    return dict(email=f"{uuid4().hex}@example.com", password_hash="test-only-placeholder", first_name="Naveen", last_name="Chandra")
 
 
 def reject(conn, statement, state, constraint=None):
@@ -114,7 +114,7 @@ def test_relationship_duplicate_and_date_order(connection):
     connection.execute(WorkRelationship.__table__.insert().values(**payload))
     reject(connection, WorkRelationship.__table__.insert().values(**payload), '23505', 'uq_work_relationships_person_employer_start')
     reject(connection, WorkRelationship.__table__.insert().values(**{**payload, 'start_date': date(2027, 1, 1), 'end_date': date(2026, 1, 1)}), '23514', 'ck_work_relationships_dates')
-    # Rehire is another episode for the same identity; overlap policy belongs to later services.
+    # Rehire keeps the same person identity; employment services enforce overlap rules.
     connection.execute(WorkRelationship.__table__.insert().values(**{**payload, 'start_date': date(2027, 1, 1)}))
 
 
@@ -167,7 +167,7 @@ def test_existing_auth_flow_without_person_and_no_email_link(connection):
         email = f'{uuid4().hex}@example.com'
         session.add(Person(**person_values(), personal_email=email))
         session.flush()
-        user = register_user(session, RegisterRequest(email=email, password='TestOnly!Password123', first_name='Test', last_name='Account'))
+        user = register_user(session, RegisterRequest(email=email, password='TestOnly!Password123', first_name='Naveen', last_name='Chandra'))
         assert user.person_id is None and user.person is None
         assert authenticate_user(session, email, 'TestOnly!Password123').id == user.id
         response = UserResponse.model_validate(user)

@@ -6,7 +6,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.database import SessionLocal
 from app.services.core_hr.common import HRError
-from app.services.fbp.demo import seed_demo
+from app.services.fbp.seed import seed_demo
 
 
 def main():

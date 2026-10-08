@@ -19,7 +19,7 @@ from app.main import app
 from app.schemas import core_hr as s
 from app.services.core_hr import employment as e, records, queries
 from app.services.core_hr.common import Conflict, InvalidOperation
-from app.services.core_hr.demo import seed_demo
+from app.services.core_hr.seed import seed_demo
 
 START = date(2024, 1, 1)
 CHANGE = date(2025, 1, 1)
@@ -39,7 +39,7 @@ def db():
 def refs(db):
     def create(model, **kwargs):
         contract = s.REFERENCE_SCHEMAS[model.__name__][0]
-        return records.create_reference(db, model, contract(code=uuid4().hex[:24], name='Synthetic test', **kwargs))
+        return records.create_reference(db, model, contract(code=uuid4().hex[:24], name='Digital Engineering', **kwargs))
     bu = create(m.BusinessUnit)
     return dict(legal_employer_id=create(m.LegalEmployer, country_code='IN').id,
         business_unit_id=bu.id, department_id=create(m.Department, business_unit_id=bu.id).id,
@@ -47,7 +47,7 @@ def refs(db):
 
 
 def request(refs, **kwargs):
-    data = dict(person=s.PersonCreate(person_number=uuid4().hex[:24], first_name='Test', last_name='Synthetic'),
+    data = dict(person=s.PersonCreate(person_number=uuid4().hex[:24], first_name='Nikhil', last_name='Varma'),
         assignment_number=uuid4().hex[:24], employment_type='REGULAR', joining_date=START,
         work_time_type='FULL_TIME', annual_base_salary='100000.25', currency='inr', **refs)
     data.update(kwargs)
@@ -124,7 +124,7 @@ def test_history_continuity_salary_and_boundaries(db, refs):
             e.change_version(db, result.assignment.id, version(result, effective_from=at))
         with pytest.raises(Conflict):
             e.change_compensation(db, result.assignment.id, s.AssignmentCompensationCreate(effective_from=at, annual_base_salary='1', currency='INR'))
-    e.terminate_relationship(db, result.work_relationship.id, s.EndRequest(end_date=date(2025, 12, 31), reason='Test'))
+    e.terminate_relationship(db, result.work_relationship.id, s.EndRequest(end_date=date(2025, 12, 31), reason='End of fixed-term contract'))
     assert queries.worker_summary(db, result.person.id, date(2026, 1, 1)).placements == []
     assert e.current_compensation(db, result.assignment.id, date(2026, 1, 1)) is None
     assert e.get(db, m.Assignment, result.assignment.id).end_date == date(2025, 12, 31)
@@ -190,8 +190,8 @@ def test_contract_rejections(refs, change):
 
 
 def test_reference_update_deactivate_person_and_seed(db, refs, monkeypatch):
-    from app.services.core_hr import demo
-    monkeypatch.setattr(demo, "PREFIX", "T" + uuid4().hex[:6].upper() + "_")
+    from app.services.core_hr import seed
+    monkeypatch.setattr(seed, "PREFIX", "T" + uuid4().hex[:6].upper() + "_")
     unit = records.update_reference(db, m.BusinessUnit, refs['business_unit_id'], s.BusinessUnitUpdate(name=' Renamed ', is_active=False))
     assert unit.name == 'Renamed' and not unit.is_active
     with pytest.raises(InvalidOperation):
@@ -213,7 +213,7 @@ def client(db):
 
 
 def headers(db, role, person_id=None):
-    user = m.User(email=f'{uuid4().hex}@example.com', first_name='Test', last_name='Role', password_hash='test-only', person_id=person_id)
+    user = m.User(email=f'{uuid4().hex}@example.com', first_name='Manoj', last_name='Kumar', password_hash='test-only', person_id=person_id)
     db.add(user)
     db.flush()
     role_id = db.scalar(select(m.Role.id).where(m.Role.name == role))
@@ -262,7 +262,7 @@ def test_employee_self_only(client, db, refs):
 
 
 def test_auth_cookie_regression(client):
-    payload = dict(email=f'{uuid4().hex}@example.com', password='SyntheticTest!12345', first_name='Auth', last_name='Test')
+    payload = dict(email=f'{uuid4().hex}@example.com', password='SyntheticTest!12345', first_name='Sandeep', last_name='Reddy')
     assert client.post('/auth/register', json=payload).status_code == 201
     assert client.post('/auth/register', json=payload).status_code == 409
     assert client.post('/auth/register', json={**payload, 'role': 'ADMIN'}).status_code == 422
@@ -346,7 +346,7 @@ def test_api_changes_rehire_termination_and_sanitized_conflicts(client, db, refs
     data=request(refs, joining_date=date(2026,1,1)).model_dump(mode='json',exclude={'person','person_id'})
     assert client.post(f'/core-hr/workers/{result.person.id}/rehire',json=data,headers=auth).status_code == 201
     assert client.post(f'/core-hr/workers/{result.person.id}/rehire',json={**data,'person_id':str(uuid4())},headers=auth).status_code == 422
-    payload={'code':'DUPLICATE_API','name':'Test'}
+    payload={'code':'DUPLICATE_API','name':'Corporate Functions'}
     assert client.post('/core-hr/reference/jobs',json=payload,headers=auth).status_code == 201
     duplicate=client.post('/core-hr/reference/jobs',json=payload,headers=auth)
     assert duplicate.status_code == 409 and 'INSERT' not in duplicate.text and 'psycopg' not in duplicate.text
@@ -415,7 +415,7 @@ def test_database_failures_are_safe_api_errors(client, db, monkeypatch, operatio
     else:
         monkeypatch.setattr(records, 'create_person', failed)
         response = client.post('/core-hr/persons', headers=auth,
-            json={'person_number':'SAFE_ERROR','first_name':'Test','last_name':'Synthetic'})
+            json={'person_number':'SAFE_ERROR','first_name':'Nikhil','last_name':'Varma'})
     assert response.status_code == 500
     assert set(response.json()) == {'detail'}
     assert 'secret_database_statement' not in response.text
@@ -426,7 +426,7 @@ def test_database_failures_are_safe_api_errors(client, db, monkeypatch, operatio
 def test_same_date_as_of_order_is_stable(db, refs):
     first = e.hire(db, request(refs))
     other_employer = records.create_reference(db, m.LegalEmployer,
-        s.LegalEmployerCreate(code=uuid4().hex[:20], name='Test employer', country_code='IN'))
+        s.LegalEmployerCreate(code=uuid4().hex[:20], name='Asterion Digital Technologies Pvt. Ltd.', country_code='IN'))
     second = e.hire(db, request(refs, person=None, person_id=first.person.id, legal_employer_id=other_employer.id))
     relationships = e.relationships_for_person(db, first.person.id)
     assert [r.id for r in relationships] == sorted([first.work_relationship.id, second.work_relationship.id])
@@ -447,10 +447,10 @@ def test_history_reads_refresh_cached_rows(db, refs):
 
 
 def test_seed_rejects_incomplete_existing_history(db, monkeypatch):
-    from app.services.core_hr import demo
-    monkeypatch.setattr(demo, 'PREFIX', 'T' + uuid4().hex[:6].upper() + '_')
+    from app.services.core_hr import seed
+    monkeypatch.setattr(seed, 'PREFIX', 'T' + uuid4().hex[:6].upper() + '_')
     assert seed_demo(db)['created'] is True
-    assignment_id = db.scalar(select(m.Assignment.id).where(m.Assignment.assignment_number == demo.PREFIX + 'A00'))
+    assignment_id = db.scalar(select(m.Assignment.id).where(m.Assignment.assignment_number == seed.PREFIX + 'A00'))
     # Corrupt only this rolled-back fixture; rerunning must not claim success or repair history.
     db.execute(delete(m.AssignmentCompensation).where(m.AssignmentCompensation.assignment_id == assignment_id))
     before = counts(db)

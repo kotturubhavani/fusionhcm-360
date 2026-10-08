@@ -1,6 +1,6 @@
-﻿# Synthetic Employee Transfer Policy
+# Employee Transfer Policy
 
-This fictional policy explains worker transfers in the Demo360 portfolio dataset.
+This policy describes worker transfers within the fictional Asterion group. The examples use fictional employment records and do not describe a real employer's procedures.
 
 HR records a department, business unit, job, location or manager change as a new dated assignment version. A department must belong to the selected business unit. The previous version remains available for historical queries. Effective dates cannot overlap and manager relationships cannot form reporting cycles.
 

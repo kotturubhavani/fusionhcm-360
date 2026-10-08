@@ -20,7 +20,7 @@ import { AnalyticsClient } from './analytics/api'
 const definition: Definition = {
   id: 'd',
   code: 'SYNTHETIC',
-  name: 'Synthetic integration',
+  name: 'Worker Master Outbound',
   description: null,
   direction: 'OUTBOUND',
   integration_type: 'WORKER_EXPORT',
@@ -60,7 +60,7 @@ it.each([true, false])('integration navigation staff=%s', (staff) => {
     </MemoryRouter>,
   )
   expect(
-    Boolean(screen.queryByRole('link', { name: 'Integration Center' })),
+    Boolean(screen.queryByRole('link', { name: 'Integrations' })),
   ).toBe(staff)
 })
 it('definitions, recent runs and loading', async () => {
@@ -75,7 +75,7 @@ it('definitions, recent runs and loading', async () => {
   expect(screen.getAllByRole('status').length).toBeGreaterThan(0)
   await screen.findByText('COMPLETED')
   expect(
-    screen.getAllByRole('link', { name: 'Synthetic integration' }),
+    screen.getAllByRole('link', { name: 'Worker Master Outbound' }),
   ).toHaveLength(2)
 })
 it('list failure has retry', async () => {
@@ -108,7 +108,7 @@ it('controlled create conditional transport and credential reference', async () 
     target: { value: 'SYNTHETIC' },
   })
   fireEvent.change(screen.getByLabelText('Name'), {
-    target: { value: 'Synthetic integration' },
+    target: { value: 'Worker Master Outbound' },
   })
   fireEvent.change(screen.getByLabelText('Transport'), {
     target: { value: 'HTTP_REST' },
@@ -217,7 +217,7 @@ it('inbound REST uses typed columns', async () => {
     target: { value: 'SYNTHETIC_P' },
   })
   fireEvent.change(screen.getByLabelText('preferred name'), {
-    target: { value: 'Synthetic' },
+    target: { value: 'Nikhil' },
   })
   fireEvent.click(
     screen.getByLabelText('I confirm this local synthetic integration run.'),
@@ -226,7 +226,7 @@ it('inbound REST uses typed columns', async () => {
   await waitFor(() =>
     expect(execute).toHaveBeenCalledWith('d', {
       request_key: expect.any(String),
-      records: [{ person_number: 'SYNTHETIC_P', preferred_name: 'Synthetic' }],
+      records: [{ person_number: 'SYNTHETIC_P', preferred_name: 'Nikhil' }],
     }),
   )
 })
@@ -323,7 +323,7 @@ it('employee direct URL redirects without integration calls', async () => {
         user={{
           id: 'u',
           email: 'employee@example.test',
-          first_name: 'Synthetic',
+          first_name: 'Nikhil',
           last_name: 'Employee',
           roles: ['EMPLOYEE'],
         }}
@@ -365,12 +365,12 @@ it('inbound FILE reads CSV and sends content without a local path', async () => 
     </MemoryRouter>,
   )
   const file = new File(
-    ['person_number,preferred_name\nSYNTHETIC_P,Synthetic\n'],
-    'synthetic.csv',
+    ['person_number,preferred_name\nSYNTHETIC_P,Nikhil\n'],
+    'person-updates.csv',
     { type: 'text/csv' },
   )
   Object.defineProperty(file, 'text', {
-    value: async () => 'person_number,preferred_name\nSYNTHETIC_P,Synthetic\n',
+    value: async () => 'person_number,preferred_name\nSYNTHETIC_P,Nikhil\n',
   })
   fireEvent.change(await screen.findByLabelText(/CSV input/), {
     target: { files: [file] },
@@ -387,7 +387,7 @@ it('inbound FILE reads CSV and sends content without a local path', async () => 
   await waitFor(() =>
     expect(execute).toHaveBeenCalledWith('d', {
       request_key: expect.any(String),
-      csv_content: 'person_number,preferred_name\nSYNTHETIC_P,Synthetic\n',
+      csv_content: 'person_number,preferred_name\nSYNTHETIC_P,Nikhil\n',
     }),
   )
 })

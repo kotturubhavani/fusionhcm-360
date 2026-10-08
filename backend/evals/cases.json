@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Synthetic Demo360 baseline. Fixed as-of 2026-10-07; exact values are reviewed fixture expectations, not generated from answers.",
+  "description": "Fictional Asterion workforce baseline. Fixed as-of 2026-10-07; exact values are reviewed fixture expectations, not generated from answers.",
   "cases": [
     {
       "id": "HCM-001",
@@ -129,7 +129,7 @@
     {
       "id": "HCM-006",
       "actor": "HR",
-      "query": "Explain Cedar Synthetic's latest payroll",
+      "query": "Explain Nikhil Varma's latest payroll",
       "parameters": {
         "person_number": "DEMO360_P02"
       },
@@ -228,7 +228,7 @@
     {
       "id": "HCM-010",
       "actor": "HR",
-      "query": "Show Cedar Synthetic's latest payroll and current FBP status.",
+      "query": "Show Nikhil Varma's latest payroll and current FBP status.",
       "parameters": {},
       "categories": [
         "cross_domain",
@@ -1087,7 +1087,7 @@
     {
       "id": "HCM-052",
       "actor": "EMPLOYEE",
-      "query": "Show my payroll and Cedar Synthetic's payroll",
+      "query": "Show my payroll and Nikhil Varma's payroll",
       "parameters": {},
       "categories": [
         "authorization",

@@ -1,11 +1,11 @@
-﻿# Synthetic bulk import examples
+# Synthetic bulk import examples
 
 These CSVs use the project's own format, not Oracle HDL. No real personal or employer data is included. Files are examples for explicit upload; nothing runs on startup.
 
 First run the existing Core HR seed to provide `DEMO360_` reference codes. The examples create new `IMPORT_SAMPLE_` people/assignments; they do not modify seeded workers.
 
-1. Upload `worker_hires.csv`, validate, inspect the preview, then process. It creates Robin Synthetic.
-2. Optionally upload `worker_hires_mixed.csv`. Wren Synthetic is valid; the second row deliberately contains an invalid salary. Processing skips the invalid row.
+1. Upload `worker_hires.csv`, validate, inspect the preview, then process. It creates Pranavi Rao.
+2. Optionally upload `worker_hires_mixed.csv`. Akhil Varma is valid; the second row deliberately contains an invalid salary. Processing skips the invalid row.
 3. After the first hire, `person_updates.csv`, `assignment_changes.csv` and `compensation_changes.csv` demonstrate independent changes to that sample worker. Assignment and compensation changes are effective 2026-02-01.
 
 Do not reprocess these samples as new jobs once successful. Existing person/assignment numbers and duplicate history dates are intentionally rejected. Choose new synthetic numbers for another demonstration.

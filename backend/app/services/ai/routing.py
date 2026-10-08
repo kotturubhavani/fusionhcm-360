@@ -53,8 +53,3 @@ def plan(user,request):
     steps=[{'agent':agent_for(t),'tool':t} for t in selected]
     kind='HYBRID' if rag and len(selected)>1 else 'DOCUMENT_RAG' if rag else 'STRUCTURED_HCM_QUERY' if selected else 'GENERAL_CHAT'
     return {'query_type':kind,'steps':steps,'composition':composition,'orchestrator_route':'MULTI_AGENT' if len({s['agent'] for s in steps})>1 else 'SINGLE_AGENT' if steps else 'GENERAL_CHAT'}
-
-def route(user,request):
-    """Compatibility for callers that only need the primary intent."""
-    result=plan(user,request)
-    return result['query_type'],next((s['tool'] for s in result['steps'] if s['tool']!='retrieve_policies'),None)

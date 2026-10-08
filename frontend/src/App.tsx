@@ -38,14 +38,14 @@ export function Navigation({ staff }: { staff: boolean }) {
         ? [
             ['/', 'Dashboard'],
             ['/workers', 'Workers'],
-            ['/hire', 'Hire Worker'],
-            ['/reference', 'Reference Data'],
+            ['/hire', 'Hire worker'],
+            ['/reference', 'Reference data'],
             ['/payroll', 'Payroll'],
-            ['/fbp', 'Flexible benefits'],
-            ['/imports', 'Data Imports'],
+            ['/fbp', 'Benefits'],
+            ['/imports', 'Imports'],
             ['/reports', 'Reports'],
             ['/extracts', 'Extracts'],
-            ['/integrations', 'Integration Center'],
+            ['/integrations', 'Integrations'],
             ['/ai', 'AI Assistant'],
             ['/ai/documents', 'Policy Library'],
           ]
@@ -59,7 +59,7 @@ export function Navigation({ staff }: { staff: boolean }) {
         <NavLink
           key={to}
           to={to}
-          end={to === '/'}
+          end={to === '/' || to === '/ai'}
           className={({ isActive }) => `nav-link ${isActive ? 'selected' : ''}`}
         >
           {text}
@@ -165,7 +165,7 @@ export function Workspace({
         <p className="nav-caption">{staff ? 'WORKSPACE' : 'SELF SERVICE'}</p>
         <Navigation staff={staff} />
         <div className="sidebar-footer">
-          Core HR<span>Independent HCM simulation</span>
+          HCM simulation<span>Synthetic data only</span>
         </div>
       </aside>
       <div className="workspace">
@@ -347,14 +347,12 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
       />
     )
   return (
-    <main className="login-page">
+    <main id="main-content" className="login-page">
       <div className="w-full max-w-md">
         <div className="mb-8">
           <span className="brand-mark mb-4">F</span>
           <p className="text-2xl font-semibold tracking-tight">FusionHCM 360</p>
-          <p className="text-slate-500 mt-1">
-            A connected view of your workforce.
-          </p>
+          <p className="text-slate-500 mt-1">Workforce management</p>
         </div>
         <section className="panel" aria-busy={restoring || busy}>
           {restoring ? (
@@ -362,7 +360,6 @@ export function AuthenticatedApp({ client = auth }: { client?: AuthClient }) {
           ) : (
             <>
               <h1>Sign in</h1>
-              <p className="hint">Access your people workspace.</p>
               {error && <Notice error>{error}</Notice>}
               {logoutFailed ? (
                 <button

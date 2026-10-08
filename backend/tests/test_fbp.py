@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app import models as m
 from app.schemas import fbp as s
 from app.schemas import core_hr as hr
-from app.services.fbp import service as f, demo, rules
+from app.services.fbp import service as f, seed, rules
 from app.services.core_hr import employment as e
 from app.services.core_hr.common import Conflict, InvalidOperation
 from app.core.database import engine
@@ -18,11 +18,11 @@ from test_core_hr import db, refs, client, headers, request, version
 
 @pytest.fixture
 def plan(db,refs):
-    return f.create_plan(db,s.PlanCreate(code=uuid4().hex[:24],name='Synthetic benefits',legal_employer_id=refs['legal_employer_id'],plan_year=2025,effective_from=date(2025,1,1),effective_to=date(2025,12,31),currency='INR'))
+    return f.create_plan(db,s.PlanCreate(code=uuid4().hex[:24],name='Annual Benefits',legal_employer_id=refs['legal_employer_id'],plan_year=2025,effective_from=date(2025,1,1),effective_to=date(2025,12,31),currency='INR'))
 
 
 def component(db,plan,**kwargs):
-    return f.create_component(db,plan.id,s.ComponentCreate(code=uuid4().hex[:24],name='Synthetic flexible benefit',component_type='BENEFIT',max_amount='999999999999.99',**kwargs))
+    return f.create_component(db,plan.id,s.ComponentCreate(code=uuid4().hex[:24],name='Meal Benefit',component_type='BENEFIT',max_amount='999999999999.99',**kwargs))
 
 
 def ready(db,refs,plan):
@@ -159,7 +159,7 @@ def test_staff_api(client,db,refs,role):
     pid=response.json()['id'];e.hire(db,request(refs))
     response=client.post('/fbp/plans/'+pid+'/components',headers=auth,json=dict(code='FLEX',name='Flexible',component_type='BENEFIT',max_amount='999999.99'))
     assert response.status_code==201,response.text
-    assert client.patch('/fbp/components/'+response.json()['id'],headers=auth,json={'description':'Synthetic'}).status_code==200
+    assert client.patch('/fbp/components/'+response.json()['id'],headers=auth,json={'description':'Annual allowance'}).status_code==200
     assert client.patch('/fbp/plans/'+pid,headers=auth,json={'name':'Updated benefits'}).status_code==200
     assert client.post('/fbp/plans/'+pid+'/open',headers=auth).status_code==200
     assert client.post('/fbp/plans/'+pid+'/generate-budgets',headers=auth).status_code==200
@@ -189,12 +189,12 @@ def test_employee_ownership_api(client,db,refs,plan):
 
 
 def test_seed_idempotency(db,monkeypatch):
-    from app.services.core_hr import demo as hr_demo
-    prefix='T'+uuid4().hex[:6].upper()+'_';monkeypatch.setattr(hr_demo,'PREFIX',prefix);monkeypatch.setattr(demo,'PREFIX',prefix)
-    hr_demo.seed_demo(db);assert demo.seed_demo(db)['created']
+    from app.services.core_hr import seed as hr_seed
+    prefix='T'+uuid4().hex[:6].upper()+'_';monkeypatch.setattr(hr_seed,'PREFIX',prefix);monkeypatch.setattr(seed,'PREFIX',prefix)
+    hr_seed.seed_demo(db);assert seed.seed_demo(db)['created']
     models=[m.FBPPlan,m.FBPComponent,m.FBPWorkerBudget,m.FBPElection]
     before=[db.scalar(select(func.count()).select_from(model)) for model in models]
-    assert not demo.seed_demo(db)['created']
+    assert not seed.seed_demo(db)['created']
     assert before==[db.scalar(select(func.count()).select_from(model)) for model in models]
 
 

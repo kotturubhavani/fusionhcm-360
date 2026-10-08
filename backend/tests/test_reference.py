@@ -27,7 +27,7 @@ def connection():
 
 
 def values(conn, model):
-    result = {"code": "TEST_" + uuid4().hex[:20].upper(), "name": "Synthetic reference"}
+    result = {"code": "TEST_" + uuid4().hex[:20].upper(), "name": "Corporate Functions"}
     if model in (LegalEmployer, Location):
         result["country_code"] = "IN"
     if model is Department:

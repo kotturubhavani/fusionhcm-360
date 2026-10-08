@@ -4,33 +4,21 @@ from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# ---------------------------------------------------------------------------
-# Alembic config object
-# ---------------------------------------------------------------------------
+import app.models  # Register all tables for autogenerate.
+from app.core.config import settings
+from app.core.database import Base
+
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# ---------------------------------------------------------------------------
-# Inject DATABASE_URL from application settings (never hardcoded)
-# ---------------------------------------------------------------------------
-from app.core.config import settings  # noqa: E402
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
 
-# ---------------------------------------------------------------------------
-# Import all models so their tables are registered on Base.metadata
-# ---------------------------------------------------------------------------
-import app.models  # noqa: E402, F401
-from app.core.database import Base  # noqa: E402
 
 target_metadata = Base.metadata
 
-
-# ---------------------------------------------------------------------------
-# Migration runners
-# ---------------------------------------------------------------------------
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")

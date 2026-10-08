@@ -28,7 +28,6 @@ class Role(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
 
-    # relationships
     user_roles: Mapped[list[UserRole]] = relationship(
         "UserRole",
         back_populates="role",
@@ -77,16 +76,12 @@ class User(Base):
         onupdate=func.now(),
     )
 
-    # relationships
-    # user_roles: mutation path (add/remove roles via UserRole objects)
     user_roles: Mapped[list[UserRole]] = relationship(
         "UserRole",
         back_populates="user",
         cascade="all, delete-orphan",
     )
-    # roles: RBAC read path — selectin issues one extra SELECT per user load,
-    # not one per role, so a user with N roles costs exactly 2 queries total.
-    # viewonly=True keeps writes through user_roles only, no overlap warnings.
+    # Load roles for RBAC; mutations go through UserRole only.
     roles: Mapped[list[Role]] = relationship(
         "Role",
         secondary="user_roles",
@@ -110,6 +105,5 @@ class UserRole(Base):
         primary_key=True,
     )
 
-    # relationships
     user: Mapped[User] = relationship("User", back_populates="user_roles")
     role: Mapped[Role] = relationship("Role", back_populates="user_roles")

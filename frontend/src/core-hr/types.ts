@@ -109,6 +109,7 @@ export const label = (value?: string | null) =>
         .toLowerCase()
         .replaceAll('_', ' ')
         .replace(/^./, (c) => c.toUpperCase())
+        .replace(/\b(hr|fbp|http|csv|json)\b/gi, (word) => word.toUpperCase())
     : 'Not provided'
 // Format the decimal text without conversion to a floating-point number.
 export const salary = (amount: string, currency: string) =>

@@ -48,7 +48,7 @@ def test_generation_and_embedding_contract(transport):
                     (200, response('{"selected_ids":["known"]}'))])
     vector = p.embed(['policy'])[0]
     assert len(vector) == 768 and math.isclose(sum(x*x for x in vector), 1)
-    assert p.select('question', [{'id': 'known', 'text': 'Synthetic policy'}], {'net': '61108.33'}).selected_ids == ['known']
+    assert p.select('question', [{'id': 'known', 'text': 'Asterion policy'}], {'net': '61108.33'}).selected_ids == ['known']
     embedding = calls[0][1]['requests'][0]
     assert embedding['taskType'] == 'RETRIEVAL_DOCUMENT' and embedding['outputDimensionality'] == 768
     generation = calls[1][1]
@@ -82,7 +82,7 @@ def test_errors_are_safe_and_never_fall_back(transport, reply):
 def test_selection_rejects_untrusted_output(transport, output):
     transport[1].append((200, response(output)))
     with pytest.raises(providers.ProviderError):
-        providers.provider().select('q', [{'id': 'ok', 'text': 'Synthetic'}], {})
+        providers.provider().select('q', [{'id': 'ok', 'text': 'Policy excerpt'}], {})
 
 
 @pytest.mark.parametrize('values', [[0.1]*256, [0.0]*768, [True]*768, ['bad']*768])

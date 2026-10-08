@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { Link, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { Badge, LoadState, Notice, PageTitle } from '../components/ui'
 import { useLoad } from '../components/useLoad'
+import { label } from '../core-hr/types'
 import { saveBlob } from '../analytics/api'
 import type {
   Config,
@@ -146,7 +147,7 @@ export function Dashboard({ api }: { api: IntegrationsClient }) {
   return (
     <>
       <PageTitle
-        title="Integration Center"
+        title="Integrations"
         description="Exchange synthetic workforce data and monitor delivery."
       >
         <Link className="primary" to="/integrations/new">
@@ -179,8 +180,8 @@ export function Dashboard({ api }: { api: IntegrationsClient }) {
                         <p className="hint">{d.code}</p>
                       </td>
                       <td>
-                        {d.direction}
-                        <p className="hint">{d.integration_type}</p>
+                        {label(d.direction)}
+                        <p className="hint">{label(d.integration_type)}</p>
                       </td>
                       <td>{d.transport_type}</td>
                       <td>{d.is_active ? 'Active' : 'Inactive'}</td>
@@ -555,7 +556,7 @@ export function DefinitionDetail({
     <>
       <PageTitle
         title={d.name}
-        description={`${d.code} · ${d.direction} · ${d.integration_type}`}
+        description={`${d.code} · ${label(d.direction)} · ${label(d.integration_type)}`}
       >
         <Link className="secondary" to={'/integrations/' + d.id + '/edit'}>
           Edit integration
@@ -773,7 +774,7 @@ export function RunDetail({ api }: { api: IntegrationsClient }) {
         {run.safe_error_message && (
           <Notice error>{run.safe_error_message}</Notice>
         )}
-        <h2>Safe request / response metadata</h2>
+        <h2>Request and response details</h2>
         <pre className="overflow-auto text-sm">
           {JSON.stringify(
             { request: run.request_metadata, response: run.response_metadata },

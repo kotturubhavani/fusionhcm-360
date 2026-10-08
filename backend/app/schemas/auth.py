@@ -23,7 +23,7 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # Existing identities may use a local development domain; registration validates new email addresses.
+    # Existing accounts may use local domains; registration still validates email.
     email: str = Field(strict=True, min_length=1, max_length=255)
     password: str = Field(max_length=128)
 
@@ -32,7 +32,6 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    # Existing identities may use a local development domain; registration validates new email addresses.
     email: str = Field(strict=True, min_length=1, max_length=255)
     first_name: str
     last_name: str

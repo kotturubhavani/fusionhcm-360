@@ -40,9 +40,7 @@ def get_current_user(
     return user
 
 
-# ---------------------------------------------------------------------------
 # RBAC dependencies — no implicit hierarchy
-# ---------------------------------------------------------------------------
 
 def _require_roles(allowed: set[str]):
     """Factory returning a dependency that enforces an explicit role allowlist."""

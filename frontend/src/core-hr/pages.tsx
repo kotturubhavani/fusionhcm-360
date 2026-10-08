@@ -123,12 +123,12 @@ export function Dashboard({
             ))}
           </div>
           <p className="hint">
-            Counts include all fetched records. Reference counts include
-            inactive records; placements reflect the selected date.
+            Reference counts include inactive records. Placements are as of the
+            selected date.
           </p>
           <section className="panel">
             <div className="flex items-center justify-between gap-3">
-              <h2>Workforce at a glance</h2>
+              <h2>Current assignments</h2>
               <Link className="link text-sm" to="/workers">
                 View all workers
               </Link>

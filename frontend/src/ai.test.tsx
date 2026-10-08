@@ -8,14 +8,14 @@ import type { Message, Policy } from './ai/api'
 import { Chat, PolicyLibrary, AIRoutes, Answer } from './ai/pages'
 const caps = {
   provider: 'mock',
-  mode: 'Deterministic demo',
+  mode: 'Deterministic responses',
   staff: true,
   document_max_bytes: 2097152,
   streaming: false,
 }
 const convo = {
   id: 'c',
-  title: 'Synthetic question',
+  title: 'What is the remote work policy?',
   scope: 'STAFF',
   updated_at: '2026-01-01T00:00:00Z',
 }
@@ -23,7 +23,7 @@ const citation = {
   id: 'chunk',
   document_id: 'document',
   document_name: 'remote.md',
-  source_name: 'Synthetic policies',
+  source_name: 'Asterion Policies',
   chunk_index: 0,
   text: 'Remote work requires manager approval.',
   score: 0.8,
@@ -45,7 +45,7 @@ const answer: Message = {
 const policy: Policy = {
   id: 'd',
   source_id: 's',
-  filename: 'synthetic.md',
+  filename: 'remote-work.md',
   content_type: 'text/markdown',
   status: 'INDEXED',
   indexed_at: '2026-01-01T00:00:00Z',
@@ -58,6 +58,20 @@ function client() {
   vi.spyOn(api, 'conversations').mockResolvedValue([])
   return api
 }
+it('highlights only Policy Library on its route', () => {
+  render(
+    <MemoryRouter initialEntries={['/ai/documents']}>
+      <Navigation staff />
+    </MemoryRouter>,
+  )
+  expect(screen.getByRole('link', { name: 'Policy Library' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  )
+  expect(
+    screen.getByRole('link', { name: 'AI Assistant' }),
+  ).not.toHaveAttribute('aria-current')
+})
 it.each([true, false])('AI navigation and library staff=%s', (staff) => {
   render(
     <MemoryRouter>
@@ -178,7 +192,7 @@ it('opens history and starts fresh conversation', async () => {
     </MemoryRouter>,
   )
   fireEvent.click(
-    await screen.findByRole('button', { name: 'Synthetic question' }),
+    await screen.findByRole('button', { name: 'What is the remote work policy?' }),
   )
   await screen.findByText('9000.20')
   expect(history).toHaveBeenCalledWith('c')
@@ -209,7 +223,7 @@ it('document upload and indexed status', async () => {
     </MemoryRouter>,
   )
   await screen.findByText('INDEXED')
-  const file = new File(['Synthetic remote policy text.'], 'synthetic.md', {
+  const file = new File(['Asterion remote policy text.'], 'remote-work.md', {
     type: 'text/markdown',
   })
   fireEvent.change(screen.getByLabelText('Policy document'), {
@@ -218,7 +232,7 @@ it('document upload and indexed status', async () => {
   fireEvent.submit(
     screen.getByRole('button', { name: 'Upload and index' }).closest('form')!,
   )
-  await screen.findByText('synthetic.md: INDEXED')
+  await screen.findByText('remote-work.md: INDEXED')
   expect(upload).toHaveBeenCalledWith(file, 'ALL')
 })
 it('reindex failure and deactivate controls', async () => {

@@ -21,11 +21,11 @@ def snapshot(definition):
 def calculate(base, allowance, retirement_rate, withholding_rate):
     base, allowance = money(base), money(allowance)
     gross = base + allowance
-    lines = [('EARNING', 'BASE_PAY', 'Prorated monthly base pay', base)]
+    lines = [('EARNING', 'BASE_PAY', 'Basic Pay', base)]
     if allowance:
-        lines.append(('EARNING', 'STANDARD_ALLOWANCE', 'Demo standard allowance', allowance))
+        lines.append(('EARNING', 'STANDARD_ALLOWANCE', 'Standard Allowance', allowance))
     # Demo retirement uses base earnings; demo withholding uses gross earnings.
-    lines += [('DEDUCTION', 'DEMO_RETIREMENT', 'Demo retirement deduction', money(base * retirement_rate)),
-              ('DEDUCTION', 'DEMO_WITHHOLDING', 'Demo withholding deduction', money(gross * withholding_rate))]
+    lines += [('DEDUCTION', 'DEMO_RETIREMENT', 'Retirement Contribution', money(base * retirement_rate)),
+              ('DEDUCTION', 'DEMO_WITHHOLDING', 'Income Tax Withholding', money(gross * withholding_rate))]
     deductions = sum((line[3] for line in lines if line[0] == 'DEDUCTION'), Decimal('0.00'))
     return lines, gross, deductions, gross - deductions

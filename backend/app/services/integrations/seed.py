@@ -7,7 +7,7 @@ from .service import create
 @atomic
 def seed(db):
     count=0
-    for code,name,kind in [('DEMO360_I_WORKERS','Worker Snapshot File Export','WORKER_EXPORT'),('DEMO360_I_PAYROLL','Payroll Results File Export','PAYROLL_EXPORT'),('DEMO360_I_FBP','FBP Elections File Export','FBP_EXPORT')]:
+    for code,name,kind in [('DEMO360_I_WORKERS','Worker Master Outbound','WORKER_EXPORT'),('DEMO360_I_PAYROLL','Payroll Results Outbound','PAYROLL_EXPORT'),('DEMO360_I_FBP','Benefits Elections Outbound','FBP_EXPORT')]:
         existing=db.scalar(select(m.IntegrationDefinition).where(m.IntegrationDefinition.code==code))
         if existing:
             if existing.direction!='OUTBOUND' or existing.integration_type!=kind or existing.transport_type!='FILE':raise Conflict('Reserved demo integration has conflicting settings.')

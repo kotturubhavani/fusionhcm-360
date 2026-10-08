@@ -1,4 +1,4 @@
-﻿import { expect, it, vi } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { AuthClient } from './auth'
@@ -17,7 +17,7 @@ import {
 const plan: Plan = {
   id: 'plan',
   code: 'SYNTH',
-  name: 'Synthetic annual benefits',
+  name: 'Annual Benefits',
   legal_employer_id: 'employer',
   plan_year: 2026,
   effective_from: '2026-01-01',
@@ -33,7 +33,7 @@ const component: Component = {
   plan_id: 'plan',
   code: 'FLEX',
   name: 'Flexible benefit',
-  description: 'Synthetic benefit',
+  description: 'Annual allowance',
   component_type: 'BENEFIT',
   min_amount: '0.00',
   max_amount: '999999.99',
@@ -47,7 +47,7 @@ const budget: Budget = {
   person_id: 'person',
   assignment_id: 'assignment',
   person_number: 'P01',
-  worker_name: 'Cedar Synthetic',
+  worker_name: 'Nikhil Varma',
   assignment_number: 'A01',
   annual_base_salary: '120000.00',
   budget_rate: '0.10',
@@ -80,7 +80,7 @@ function setup() {
   vi.spyOn(hr, 'all').mockResolvedValue([
     {
       id: 'employer',
-      name: 'Synthetic employer',
+      name: 'Asterion Digital Technologies Pvt. Ltd.',
       code: 'EMP',
       is_active: true,
     },
@@ -99,7 +99,7 @@ it.each([true, false])(
         <Navigation staff={staff} />
       </MemoryRouter>,
     )
-    expect(!!screen.queryByRole('link', { name: 'Flexible benefits' })).toBe(
+    expect(!!screen.queryByRole('link', { name: 'Benefits' })).toBe(
       staff,
     )
     expect(!!screen.queryByRole('link', { name: 'My benefits' })).toBe(!staff)
@@ -117,7 +117,7 @@ it('lists plans and creates a calendar-year plan with string rate', async () => 
   await screen.findByText(plan.name)
   fireEvent.click(screen.getByText('Create plan'))
   fill('Code *', 'NEW')
-  fill('Plan name *', 'New synthetic')
+  fill('Plan name *', 'Annual Benefits 2027')
   fill('Legal employer *', 'employer')
   fill('Plan year *', '2027')
   fill('Currency *', 'INR')
@@ -152,7 +152,7 @@ it('renders plan detail and worker allocation overview', async () => {
       </Routes>
     </MemoryRouter>,
   )
-  await screen.findByText('Cedar Synthetic')
+  await screen.findByText('Nikhil Varma')
   expect(screen.getByText('A01')).toBeInTheDocument()
   expect(
     screen.getByRole('button', { name: 'Generate budgets' }),

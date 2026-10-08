@@ -15,7 +15,7 @@ import type { References, Worker } from './core-hr/types'
 const ref = {
   id: 'ref',
   code: 'SYNTH',
-  name: 'Synthetic organization',
+  name: 'Digital Engineering',
   is_active: true,
 }
 const refs: References = {
@@ -29,10 +29,10 @@ const refs: References = {
 const person = {
   id: 'person',
   person_number: 'P100',
-  first_name: 'Aster',
-  last_name: 'Synthetic',
+  first_name: 'Sai Kiran',
+  last_name: 'Reddy',
   preferred_name: null,
-  personal_email: 'aster@example.test',
+  personal_email: 'sai.kiran@example.test',
   date_of_birth: null,
   phone: null,
   is_active: true,
@@ -91,9 +91,9 @@ const worker: Worker = {
 }
 const user = {
   id: 'user',
-  first_name: 'Aster',
-  last_name: 'Synthetic',
-  email: 'aster@example.test',
+  first_name: 'Sai Kiran',
+  last_name: 'Reddy',
+  email: 'sai.kiran@example.test',
   roles: ['EMPLOYEE'],
 }
 function client() {
@@ -124,7 +124,9 @@ describe('role-aware workspace', () => {
         <Navigation staff={staff} />
       </MemoryRouter>,
     )
-    expect(screen.queryByText('Hire Worker') !== null).toBe(staff)
+    expect(screen.queryByRole('link', { name: 'Hire worker' }) !== null).toBe(
+      staff,
+    )
     expect(screen.queryByText('My employment') !== null).toBe(!staff)
   })
   it('employee deep links resolve to self service without any directory request or HR controls', async () => {
@@ -152,7 +154,9 @@ describe('role-aware workspace', () => {
     expect(api.workers).not.toHaveBeenCalled()
     expect(api.references).not.toHaveBeenCalled()
     expect(screen.queryByText('Change compensation')).not.toBeInTheDocument()
-    expect(screen.queryByText('Hire Worker')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: 'Hire worker' }),
+    ).not.toBeInTheDocument()
   })
   it('restores auth then logs out and removes private content', async () => {
     const auth = new AuthClient('http://localhost:8000')
@@ -177,7 +181,7 @@ it('renders directory names, numbers and assignments', () => {
       <WorkerTable workers={[worker]} refs={refs} />
     </MemoryRouter>,
   )
-  expect(screen.getByRole('link', { name: 'Aster Synthetic' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Sai Kiran Reddy' })).toHaveAttribute(
     'href',
     '/workers/person?as_of=2026-10-05',
   )
@@ -214,7 +218,7 @@ it('submits hire with nested identity, filtered department and decimal salary te
   await screen.findByLabelText('Business unit *')
   field('Person number', 'P200')
   field('First name', 'Birch')
-  field('Last name', 'Synthetic')
+  field('Last name', 'Reddy')
   field('Legal employer', ref.id)
   field('Assignment number', 'A200')
   organization()
@@ -315,7 +319,7 @@ it('creates, edits and deactivates references through POST/PATCH payloads', asyn
   render(<ReferencePage api={api} refs={refs} reload={reload} />)
   fireEvent.click(screen.getByText('Add record'))
   field('Code', 'NEW')
-  field('Name', 'New Synthetic')
+  field('Name', 'Cloud Engineering')
   field('Country code', 'IN')
   fireEvent.submit(screen.getByText('Save record').closest('form')!)
   await waitFor(() =>
@@ -323,7 +327,7 @@ it('creates, edits and deactivates references through POST/PATCH payloads', asyn
       'legal-employers',
       {
         code: 'NEW',
-        name: 'New Synthetic',
+        name: 'Cloud Engineering',
         country_code: 'IN',
         is_active: true,
       },
@@ -331,21 +335,21 @@ it('creates, edits and deactivates references through POST/PATCH payloads', asyn
     ),
   )
   await screen.findByText('Legal employers saved.')
-  fireEvent.click(screen.getByLabelText('Edit Synthetic organization'))
-  field('Name', 'Updated Synthetic')
+  fireEvent.click(screen.getByLabelText('Edit Digital Engineering'))
+  field('Name', 'Platform Engineering')
   field('Country code', 'IN')
   fireEvent.submit(screen.getByText('Save record').closest('form')!)
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith(
       'legal-employers',
-      expect.objectContaining({ name: 'Updated Synthetic' }),
+      expect.objectContaining({ name: 'Platform Engineering' }),
       'ref',
     ),
   )
   await waitFor(() =>
     expect(screen.queryByText('Save record')).not.toBeInTheDocument(),
   )
-  fireEvent.click(screen.getByLabelText('Deactivate Synthetic organization'))
+  fireEvent.click(screen.getByLabelText('Deactivate Digital Engineering'))
   await waitFor(() =>
     expect(save).toHaveBeenCalledWith(
       'legal-employers',

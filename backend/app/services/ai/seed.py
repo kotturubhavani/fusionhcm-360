@@ -8,7 +8,7 @@ def seed(db,user):
     root=Path(__file__).resolve().parents[4]/'synthetic-data'/'policies'
     result=[]
     for path in sorted(root.glob('*.md')):
-        row=ingest(db,user,path.name,path.read_bytes(),'ALL','Synthetic demo policies')
+        row=ingest(db,user,path.name,path.read_bytes(),'ALL','Asterion Policies')
         if row.status=='FAILED':row=reindex(db,user,row.id)
         result.append(row)
     if len(result)!=5:raise InvalidOperation('Expected five synthetic policy documents.')

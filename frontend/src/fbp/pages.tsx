@@ -104,7 +104,7 @@ export function PlansPage({ api, hr }: { api: FbpClient; hr: CoreHrClient }) {
   return (
     <>
       <PageTitle
-        title="Flexible benefits"
+        title="Benefits"
         description="Annual plans and worker allocation progress."
       />
       <LoadState {...load} />

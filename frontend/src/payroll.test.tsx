@@ -24,8 +24,8 @@ import {
 import { salary } from './core-hr/types'
 const definition: Definition = {
   id: 'd',
-  code: 'DEMO',
-  name: 'Synthetic monthly',
+  code: 'IN_MONTHLY',
+  name: 'Asterion India Monthly Payroll',
   legal_employer_id: 'employer',
   country_code: 'IN',
   currency: 'INR',
@@ -59,7 +59,7 @@ const run: Run = {
 const result: Result = {
   id: 'result',
   payroll_run_id: 'r',
-  worker_name: 'Aster Synthetic',
+  worker_name: 'Sai Kiran Reddy',
   person_number: 'P01',
   assignment_number: 'A01',
   gross_pay: '11000.00',
@@ -88,7 +88,7 @@ const detail: ResultDetail = {
       id: 'line',
       line_type: 'EARNING',
       code: 'BASE_PAY',
-      name: 'Prorated monthly base pay',
+      name: 'Basic Pay',
       amount: '10000.00',
     },
   ],
@@ -103,7 +103,7 @@ function setup() {
   vi.spyOn(hr, 'all').mockResolvedValue([
     {
       id: 'employer2',
-      name: 'Second Synthetic',
+      name: 'Asterion Business Services Payroll',
       is_active: true,
       code: 'EMP2',
     },
@@ -133,7 +133,7 @@ it('lists and creates definitions with decimal strings', async () => {
       <Definitions api={api} hr={hr} />
     </MemoryRouter>,
   )
-  await screen.findByText('Synthetic monthly')
+  await screen.findByText('Asterion India Monthly Payroll')
   fireEvent.click(screen.getByText('Create definition'))
   fill('Code *', 'SECOND')
   fill('Name *', 'Second payroll')
@@ -194,7 +194,7 @@ it('processing requires confirmation and disables duplicate submit while pending
     </MemoryRouter>,
   )
   fireEvent.click(
-    await screen.findByRole('button', { name: 'Process 2025-01 · DEMO' }),
+    await screen.findByRole('button', { name: 'Process 2025-01 · IN_MONTHLY' }),
   )
   expect(screen.getByRole('checkbox')).toBeRequired()
   fireEvent.click(screen.getByRole('checkbox'))
@@ -224,7 +224,7 @@ it('renders run metadata totals and result table', async () => {
   vi.spyOn(api, 'request').mockResolvedValue({
     run,
     period,
-    definition_name: 'Synthetic monthly',
+    definition_name: 'Asterion India Monthly Payroll',
     currency: 'INR',
     result_count: 1,
     gross_pay: '11000.00',
@@ -239,7 +239,7 @@ it('renders run metadata totals and result table', async () => {
       </Routes>
     </MemoryRouter>,
   )
-  await screen.findByText('Aster Synthetic')
+  await screen.findByText('Sai Kiran Reddy')
   expect(screen.getAllByText('INR 9,400.00')).toHaveLength(2)
   expect(screen.getByRole('link', { name: 'View result' })).toHaveAttribute(
     'href',
@@ -275,7 +275,8 @@ it('employee detail uses the self-service endpoint and shows lines', async () =>
       </Routes>
     </MemoryRouter>,
   )
-  await screen.findByText('BASE_PAY')
+  await screen.findByText('Basic Pay')
+  expect(screen.queryByText('BASE_PAY')).not.toBeInTheDocument()
   expect(request).toHaveBeenCalledWith('/me/result')
   expect(screen.getByText('INR 9,400.00')).toBeInTheDocument()
 })

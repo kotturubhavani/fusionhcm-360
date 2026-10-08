@@ -1,7 +1,8 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Routes, Route, useNavigate, useParams } from 'react-router-dom'
 import { useLoad } from '../components/useLoad'
+import { label } from '../core-hr/types'
 import { Badge, LoadState, Notice, PageTitle } from '../components/ui'
 import { AnalyticsClient, saveBlob } from './api'
 import type { Definition, FieldMeta, Filter, Metadata } from './api'
@@ -67,7 +68,7 @@ export function Definitions({
     <>
       <PageTitle
         title={extract ? 'Extract definitions' : 'Saved reports'}
-        description="Manage reusable definitions, then run them explicitly."
+        description="Saved definitions and run history."
       >
         <Link className="primary" to={`${base(extract)}/new`}>
           New {extract ? 'extract' : 'report'}
@@ -86,7 +87,7 @@ export function Definitions({
                   <th>Name</th>
                   <th>Domain / type</th>
                   <th>Status</th>
-                  <th>Watermark</th>
+                  {extract && <th>Watermark</th>}
                 </tr>
               </thead>
               <tbody>
@@ -101,11 +102,17 @@ export function Definitions({
                       </Link>
                       <p className="hint">{d.code}</p>
                     </td>
-                    <td>{d.domain ?? d.extract_type}</td>
+                    <td>{label(d.domain ?? d.extract_type)}</td>
                     <td>
                       <Badge>{d.is_active ? 'Active' : 'Inactive'}</Badge>
                     </td>
-                    <td>{d.last_successful_run_at ?? '—'}</td>
+                    {extract && (
+                      <td>
+                        {d.last_successful_run_at
+                          ? new Date(d.last_successful_run_at).toLocaleString()
+                          : '—'}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -357,7 +364,7 @@ export function DefinitionEditor({
     <>
       <PageTitle
         title={`${initial ? 'Edit' : 'New'} ${extract ? 'extract' : 'report'}`}
-        description="Save a definition before running. No automatic execution."
+        description="Save the definition before running it."
       >
         <Link className="link" to={base(extract)}>
           Back to definitions

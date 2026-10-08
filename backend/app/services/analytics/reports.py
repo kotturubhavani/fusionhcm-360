@@ -1,14 +1,13 @@
-﻿"""Bounded snapshots and exact typed filtering; no client SQL."""
+"""Bounded snapshots and exact typed filtering; no client SQL."""
 import csv,io,json
 from datetime import date,datetime,UTC
 from decimal import Decimal
 from uuid import UUID
-from sqlalchemy import select,func
+from sqlalchemy import select
 from openpyxl import Workbook
 from app import models as m
-from app.core.config import settings
 from app.schemas import analytics as s
-from app.services.core_hr.common import atomic,get,Conflict,InvalidOperation
+from app.services.core_hr.common import atomic,get,Conflict
 from . import data
 from .metadata import DOMAINS,label
 

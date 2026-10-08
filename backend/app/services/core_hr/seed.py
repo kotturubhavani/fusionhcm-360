@@ -7,6 +7,8 @@ from app.services.core_hr import employment as e, records
 from app.services.core_hr.common import Conflict, atomic
 
 PREFIX = 'DEMO360_'
+EMPLOYERS = ['Asterion Digital Technologies Pvt. Ltd.', 'Asterion Business Services Pvt. Ltd.']
+WORKERS = [('Sai Kiran', 'Reddy'), ('Sravani', 'Reddy'), ('Nikhil', 'Varma'), ('Meghana', 'Chowdary'), ('Vamsi', 'Krishna'), ('Keerthana', 'Devi'), ('Karthik', 'Reddy'), ('Tejaswi', 'Rao'), ('Divya', 'Sri'), ('Harsha', 'Vardhan')]
 
 
 def validate_existing_demo(db, people):
@@ -49,17 +51,16 @@ def seed_demo(db):
         contract = s.REFERENCE_SCHEMAS[model.__name__][0]
         return records.create_reference(db, model, contract(code=PREFIX + code, name=name, **extra))
 
-    employers = [ref(m.LegalEmployer, f'LE{i}', f'Synthetic Meridian {i} Ltd', country_code='IN') for i in range(2)]
-    units = [ref(m.BusinessUnit, f'BU{i}', name) for i, name in enumerate(['Demo Engineering', 'Demo Operations'])]
-    departments = [ref(m.Department, f'D{i}', name, business_unit_id=units[i].id) for i, name in enumerate(['Demo Product', 'Demo Delivery'])]
-    jobs = [ref(m.Job, f'J{i}', name) for i, name in enumerate(['Demo Team Lead', 'Demo Engineer', 'Demo Analyst'])]
-    grades = [ref(m.Grade, f'G{i}', f'Demo Level {i + 1}') for i in range(2)]
-    locations = [ref(m.Location, f'L{i}', name, country_code='IN', city=city) for i, (name, city) in enumerate([('Demo South Office', 'Bengaluru'), ('Demo West Office', 'Pune')])]
-    names = ['Aster', 'Birch', 'Cedar', 'Dahlia', 'Elm', 'Fern', 'Grove', 'Hazel', 'Iris', 'Juniper']
+    employers = [ref(m.LegalEmployer, f'LE{i}', EMPLOYERS[i], country_code='IN') for i in range(2)]
+    units = [ref(m.BusinessUnit, f'BU{i}', name) for i, name in enumerate(['Digital Engineering', 'Business Operations'])]
+    departments = [ref(m.Department, f'D{i}', name, business_unit_id=units[i].id) for i, name in enumerate(['Product Engineering', 'Delivery Operations'])]
+    jobs = [ref(m.Job, f'J{i}', name) for i, name in enumerate(['Technical Lead', 'Software Engineer', 'Business Analyst'])]
+    grades = [ref(m.Grade, f'G{i}', ['Professional', 'Lead'][i]) for i in range(2)]
+    locations = [ref(m.Location, f'L{i}', name, country_code='IN', city=city) for i, (name, city) in enumerate([('Hyderabad - HITEC City', 'Hyderabad'), ('Bengaluru - Whitefield', 'Bengaluru')])]
     hires = []
-    for i, name in enumerate(names):
+    for i, (first_name, last_name) in enumerate(WORKERS):
         unit = i % 2
-        payload = s.HireRequest(person=s.PersonCreate(person_number=f'{PREFIX}P{i:02}', first_name=name, last_name='Synthetic', personal_email=f'{name.lower()}@example.com'),
+        payload = s.HireRequest(person=s.PersonCreate(person_number=f'{PREFIX}P{i:02}', first_name=first_name, last_name=last_name, personal_email=f'{first_name.lower().replace(" ", ".")}.{last_name.lower()}@example.com'),
             legal_employer_id=employers[unit].id, employment_type=['REGULAR', 'FIXED_TERM', 'INTERN'][i % 3],
             joining_date=date(2024, 1, 1), assignment_number=f'{PREFIX}A{i:02}', business_unit_id=units[unit].id,
             department_id=departments[unit].id, job_id=jobs[0 if i < 2 else 1 + i % 2].id,
@@ -73,7 +74,7 @@ def seed_demo(db):
     e.change_version(db, changed.assignment.id, s.AssignmentVersionCreate(effective_from=date(2025, 1, 1), **details))
     e.change_compensation(db, changed.assignment.id, s.AssignmentCompensationCreate(effective_from=date(2025, 4, 1), annual_base_salary='850000.00', currency='INR'))
     for i in (8, 9):
-        e.terminate_relationship(db, hires[i].work_relationship.id, s.EndRequest(end_date=date(2024, 12, 31), reason='Synthetic demo employment ended'))
+        e.terminate_relationship(db, hires[i].work_relationship.id, s.EndRequest(end_date=date(2024, 12, 31), reason='End of employment'))
     previous = hires[9]
     e.rehire(db, previous.person.id, s.RehireRequest(legal_employer_id=employers[1].id, employment_type='REGULAR', joining_date=date(2025, 2, 1),
         assignment_number=f'{PREFIX}A09R', business_unit_id=units[1].id, department_id=departments[1].id, job_id=jobs[2].id,
